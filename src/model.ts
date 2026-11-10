@@ -1,0 +1,11 @@
+export type Crop = 'wheat' | 'corn' | 'legume';
+export const crops = {wheat:{name:'Пшеница',need:3.6,heat:30,color:'#c6a75d'},corn:{name:'Кукуруза',need:5,heat:33,color:'#739647'},legume:{name:'Бобовая культура',need:3.2,heat:29,color:'#769c61'}};
+export const soils = {loam:{name:'Суглинистая',capacity:110},sand:{name:'Песчаная',capacity:60},clay:{name:'Глинистая',capacity:145}};
+export type Soil=keyof typeof soils;
+export interface Weather {temp:number; rain:number; label:string; source:'demo'|'nasa'}
+export function simulate(crop:Crop,soil:Soil,irrigation:number,weather:Weather){
+ const c=crops[crop], capacity=soils[soil].capacity; let water=capacity*.65,stress=0;
+ const days=Array.from({length:121},(_,day)=>{const growth=day/120; if(day===0)return {day,water,moisture:water/capacity,growth,deficit:false,heat:weather.temp>c.heat,drain:0,demand:0}; const demand=c.need*(.35+.65*Math.sin(Math.PI*growth))*Math.max(.6,1+(weather.temp-22)*.035); const incoming=weather.rain+irrigation/7; const before=water+incoming; const drain=Math.max(0,before-capacity); const available=Math.min(capacity,before); const actual=Math.min(available,demand); water=Math.max(0,available-actual); const deficit=actual<demand*.8||water<capacity*.2; if(deficit)stress++; return {day,water,moisture:water/capacity,growth,deficit,heat:weather.temp>c.heat,drain,demand};});
+ return {days,stress,irrigation:Math.round(irrigation/7*120),risk:stress>35||weather.temp>c.heat?'high':stress>8?'medium':'low'};
+}
+
