@@ -12,3 +12,20 @@ test('date comparison keeps winter offsets in the same historical season',()=>{c
 test('comparison uses all supplied years equally and does not invent missing years',()=>{const sources=[demoData('2024-03-18'),demoData('2024-04-01'),demoData('2024-04-15')];const results=compareDates([{year:2024,sources}],'2027-04-01','wheat','loam',18);assert.ok(results.every(r=>r.years.length===1));assert.equal(results[0].date,'2027-03-18');assert.equal(results[2].date,'2027-04-15');assert.equal(results[0].heat?.min,results[0].heat?.max);});
 import {riskPeriods} from './riskEvents.ts';
 test('risk periods group contiguous events without bridging safe days',()=>{const rows=analyze(demoData('2024-04-01'),'2027-04-01','wheat','loam',18).slice(0,7).map((r,i)=>({...r,heat:[0,1,4,6].includes(i)}));assert.deepEqual(riskPeriods(rows,'heat'),[{start:0,end:1,days:2},{start:4,end:4,days:1},{start:6,end:6,days:1}]);assert.deepEqual(riskPeriods([], 'heat'),[]);});
+test('water ledger conserves mass with delivery losses, rain and overflow',()=>{
+ const rows=analyze(demoData('2024-04-01'),'2027-04-01','wheat','sand',45,{efficiency:.6,initialStorage:1,weeklyLimit:21});
+ for(const r of rows){assert.ok(Math.abs(r.opening+r.rain+r.grossIrrigation-r.applicationLoss-r.drain-r.actual-r.storage)<1e-9);assert.ok(Math.abs(r.grossIrrigation-3)<1e-9);assert.ok(Math.abs(r.netIrrigation-1.8)<1e-9)}
+ assert.ok(rows.some(r=>r.drain>0));
+});
+test('zero available water means no irrigation and no artificial moisture recovery',()=>{
+ const data=demoData('2024-04-01');data.days=data.days.map(d=>({...d,rain:0}));
+ const rows=analyze(data,'2027-04-01','corn','sand',45,{efficiency:.9,initialStorage:0,weeklyLimit:0});
+ assert.ok(rows.every(r=>r.grossIrrigation===0&&r.netIrrigation===0&&r.storage===0&&r.unmet===r.demand));
+ assert.throws(()=>analyze(data,'2027-04-01','corn','sand',18,{efficiency:0}));
+});
+test('date comparison applies the same irrigation constraints as the field',()=>{
+ const sources=[demoData('2024-03-18'),demoData('2024-04-01'),demoData('2024-04-15')];
+ const options={efficiency:.6,weeklyLimit:0,initialStorage:0};
+ const compared=compareDates([{year:2024,sources}],'2027-04-01','wheat','loam',45,options);
+ assert.equal(compared[1].water!.median,analyze(sources[1],'2027-04-01','wheat','loam',45,options).filter(r=>r.waterRisk).length);
+});
