@@ -11,6 +11,19 @@ import {windowDates,spread,compareDates} from './climate.ts';
 test('date comparison keeps winter offsets in the same historical season',()=>{const w=windowDates('2027-01-05',2024);assert.equal(w.start,'2023-12-22');assert.equal(w.starts[1],'2024-01-05');assert.equal(w.starts[2],'2024-01-19');assert.equal(spread([]),null);assert.deepEqual(spread([9,1,3,5]),{min:1,max:9,median:4});});
 test('comparison uses all supplied years equally and does not invent missing years',()=>{const sources=[demoData('2024-03-18'),demoData('2024-04-01'),demoData('2024-04-15')];const results=compareDates([{year:2024,sources}],'2027-04-01','wheat','loam',18);assert.ok(results.every(r=>r.years.length===1));assert.equal(results[0].date,'2027-03-18');assert.equal(results[2].date,'2027-04-15');assert.equal(results[0].heat?.min,results[0].heat?.max);});
 import {riskPeriods} from './riskEvents.ts';
+import {terrainKey,parseTerrain,terrainHeight,terrainFrame} from './terrain.ts';
+test('terrain interpolation preserves geographic orientation and real vertical scale',()=>{
+ const plot:[[number,number],[number,number],[number,number],[number,number]]=[[38,68],[38,68.001],[38.001,68.001],[38.001,68]];
+ const key=terrainKey(plot),bounds=key.split(',').map(Number);
+ const elevations=Array.from({length:49},(_,i)=>800+Math.floor(i/7)*2+i%7);
+ const terrain=parseTerrain({size:7,bounds,elevations,url:'https://api.opentopodata.org/v1/srtm30m?test',source:'SRTM',resolution:30,fetchedAt:'2026-11-13T00:00:00Z'},key);
+ const f=terrainFrame(terrain),x=f.width*f.scale/2,z=f.depth*f.scale/2;
+ assert.equal(terrainHeight(terrain,-x,-z),0);
+ assert.ok(Math.abs(terrainHeight(terrain,x,z)-18*f.scale)<1e-9);
+ assert.ok(Math.abs(terrainHeight(terrain,0,0)-9*f.scale)<1e-9);
+ assert.throws(()=>parseTerrain({...terrain,elevations:[null,...elevations.slice(1)]},key));
+ assert.throws(()=>parseTerrain(terrain,'38,68,39,69'));
+});
 test('risk periods group contiguous events without bridging safe days',()=>{const rows=analyze(demoData('2024-04-01'),'2027-04-01','wheat','loam',18).slice(0,7).map((r,i)=>({...r,heat:[0,1,4,6].includes(i)}));assert.deepEqual(riskPeriods(rows,'heat'),[{start:0,end:1,days:2},{start:4,end:4,days:1},{start:6,end:6,days:1}]);assert.deepEqual(riskPeriods([], 'heat'),[]);});
 test('water ledger conserves mass with delivery losses, rain and overflow',()=>{
  const rows=analyze(demoData('2024-04-01'),'2027-04-01','wheat','sand',45,{efficiency:.6,initialStorage:1,weeklyLimit:21});
