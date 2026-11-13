@@ -11,7 +11,19 @@ import {windowDates,spread,compareDates} from './climate.ts';
 test('date comparison keeps winter offsets in the same historical season',()=>{const w=windowDates('2027-01-05',2024);assert.equal(w.start,'2023-12-22');assert.equal(w.starts[1],'2024-01-05');assert.equal(w.starts[2],'2024-01-19');assert.equal(spread([]),null);assert.deepEqual(spread([9,1,3,5]),{min:1,max:9,median:4});});
 test('comparison uses all supplied years equally and does not invent missing years',()=>{const sources=[demoData('2024-03-18'),demoData('2024-04-01'),demoData('2024-04-15')];const results=compareDates([{year:2024,sources}],'2027-04-01','wheat','loam',18);assert.ok(results.every(r=>r.years.length===1));assert.equal(results[0].date,'2027-03-18');assert.equal(results[2].date,'2027-04-15');assert.equal(results[0].heat?.min,results[0].heat?.max);});
 import {riskPeriods} from './riskEvents.ts';
-import {terrainKey,parseTerrain,terrainHeight,terrainFrame} from './terrain.ts';
+import {terrainKey,parseTerrain,terrainHeight,terrainFrame,terrainDirections} from './terrain.ts';
+test('downhill directions follow a plane and flat terrain invents no flow',()=>{
+ const plot:[[number,number],[number,number],[number,number],[number,number]]=[[38,68],[38,68.001],[38.001,68.001],[38.001,68]];
+ const terrain={size:7,bounds:[38,68,38.001,68.001],elevations:Array.from({length:49},(_,i)=>800+i%7),url:'',source:'test',resolution:30,fetchedAt:''};
+ const directions=terrainDirections(terrain,plot);assert.ok(directions.length>0);assert.ok(directions.every(d=>d.dx<0&&Math.abs(d.dz)<1e-9&&d.slope>0));
+ assert.equal(terrainDirections({...terrain,elevations:Array(49).fill(800)},plot).length,0);
+});
+test('rain runoff conserves water and does not subtract irrigation losses twice',()=>{
+ const data=demoData('2024-04-01');const rows=analyze(data,'2027-04-01','wheat','sand',21,{efficiency:.6,rainRunoffFraction:.4});
+ for(const r of rows){assert.ok(Math.abs(r.opening+r.rain+r.grossIrrigation-r.applicationLoss-r.rainRunoff-r.drain-r.actual-r.storage)<1e-9);assert.equal(r.rainRunoff,r.rain*.4);assert.equal(r.effectiveRain,r.rain-r.rainRunoff);assert.ok(Math.abs(r.netIrrigation-1.8)<1e-9)}
+ const all=analyze(data,'2027-04-01','wheat','sand',0,{rainRunoffFraction:1,initialStorage:0});assert.ok(all.every(r=>r.effectiveRain===0&&r.storage===0));
+ assert.throws(()=>analyze(data,'2027-04-01','wheat','sand',0,{rainRunoffFraction:1.01}));
+});
 test('terrain interpolation preserves geographic orientation and real vertical scale',()=>{
  const plot:[[number,number],[number,number],[number,number],[number,number]]=[[38,68],[38,68.001],[38.001,68.001],[38.001,68]];
  const key=terrainKey(plot),bounds=key.split(',').map(Number);
