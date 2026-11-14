@@ -70,13 +70,27 @@ export default function App(){
    run('terrain',async()=>{const result=await loadTerrain(plot,c.signal);if(fresh())setTerrainData({key:terrainKey(plot),data:result})})
   ]);clearTimeout(timer);if(fresh())setLoading(false);
  }
+ // A plan can be applied directly from Recommendations before a manual data load.
+ useEffect(()=>{
+  if(!data)return;
+  let alive=true;const c=new AbortController();const timer=setTimeout(()=>c.abort(),35000);
+  if(!terrain&&status.terrain!=='loading'){
+   setStatus(s=>({...s,terrain:'loading'}));
+   void loadTerrain(plot,c.signal).then(result=>{if(!c.signal.aborted){setTerrainData({key:terrainKey(plot),data:result});setStatus(s=>({...s,terrain:'ready'}))}}).catch(()=>{if(alive)setStatus(s=>({...s,terrain:'error'}))});
+  }
+  if(!weather&&status.forecast!=='loading'){
+   setStatus(s=>({...s,forecast:'loading'}));
+   void loadForecast({lat:coord[0],lon:coord[1],signal:c.signal}).then(result=>{if(!c.signal.aborted){setForecast({key:locationKey,data:result});setStatus(s=>({...s,forecast:'ready'}))}}).catch(()=>{if(alive)setStatus(s=>({...s,forecast:'error'}))});
+  }
+  return()=>{alive=false;clearTimeout(timer);c.abort()};
+ },[data,locationKey,JSON.stringify(plot)]);
  function applyPlan(date:string,next:IrrigationEvent[],source:SourceData,sourceYear:number){
   if(source.kind!=='nasa'||source.days.some(d=>!Number.isFinite(d.et0)))return;
   request.current?.abort();request.current=null;setLoading(false);setPlanting(date);setEvents(next);setYear(sourceYear);
   setLoaded({key:`${locationKey}:${date}:${sourceYear}:${duration}`,data:source});setDay(0);setPlaying(false);setTab('analysis');
  }
  const sourceStatus=(name:'nasa'|'forecast'|'terrain')=>name==='nasa'&&data||name==='forecast'&&weather||name==='terrain'&&terrain?'ready':status[name];
- return <div className="v2-app focused-app"><header className="v2-header"><a className="v2-brand" href="#" onClick={e=>{e.preventDefault();setTab('setup')}}><Sprout/>{t('Кишт','Kisht')}</a><nav aria-label={t('Разделы','Sections')}>{(['setup','analysis','plans','jury'] as Tab[]).map((v,i)=><button key={v} className={tab===v?'active':''} onClick={()=>setTab(v)}>{i<3&&<span>0{i+1}</span>}{({setup:t('Мой участок','My field'),analysis:t('Симуляция','Simulation'),plans:t('Рекомендации','Recommendations'),jury:t('Для жюри','Jury demo')})[v]}</button>)}</nav><button className="language" aria-label="Switch language" onClick={()=>setLang(lang==='ru'?'en':'ru')}>{lang==='ru'?'EN':'RU'}</button></header>
+ return <div className="v2-app focused-app"><header className="v2-header"><a className="v2-brand" href="#" onClick={e=>{e.preventDefault();setTab('setup')}}><Sprout/>{t('Кишт','Kisht')}</a><nav aria-label={t('Разделы','Sections')}>{(['setup','analysis','plans','jury'] as Tab[]).map((v,i)=><button key={v} className={tab===v?'active':''} onClick={()=>setTab(v)}>{i<3&&<span>0{i+1}</span>}{({setup:t('Мой участок','My field'),analysis:t('Симуляция','Simulation'),plans:t('Рекомендации','Recommendations'),jury:t('Демо симуляция','Demo simulation')})[v]}</button>)}</nav><button className="language" aria-label="Switch language" onClick={()=>setLang(lang==='ru'?'en':'ru')}>{lang==='ru'?'EN':'RU'}</button></header>
  <main className="v2-main">
  {tab==='jury'?<Suspense fallback={<p>{t('Открываем демонстрацию…','Opening demonstration…')}</p>}><JuryDemo lang={lang}/></Suspense>:<>
  <div className="v2-title"><div><span className="eyebrow">TAJIKISTAN · NASA POWER + SRTM</span><h1>{tab==='setup'?t('Ваше поле. Ваш план.','Your field. Your plan.'):tab==='analysis'?t('Что происходит с посевом?','What is happening to your crop?'):t('Когда сеять и сколько поливать?','When to sow and how much to irrigate?')}</h1><p>{tab==='setup'?t('Обведите участок, укажите дату и условия. Всё остальное загрузим одной кнопкой.','Outline your field, choose the date and conditions. One button loads the data.'):tab==='plans'?t('Сравним сроки на реальной погоде прошлых лет и соберём план для симуляции.','Compare planting dates using past weather and build a plan for simulation.'):t('Погода из NASA. Состояние растений — результат модели с вашими условиями.','Weather from NASA. Crop conditions are model estimates using your inputs.')}</p></div></div>
