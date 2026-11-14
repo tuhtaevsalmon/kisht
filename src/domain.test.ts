@@ -1,3 +1,4 @@
+import {defaultWheat} from './evapotranspiration.ts';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {addDays,analogStart,validDate,validPolygon,areaHa,analyze,demoData,parseNASA} from './domain.ts';
@@ -67,4 +68,30 @@ test('elapsed water stress survives rewatering and excludes future deficits',()=
  assert.equal(stressHistory(rows,0).limitedDays,1);
  assert.equal(stressHistory(rows,-1).unmet,0);
  assert.ok(rewatered.coverage>=0&&rewatered.coverage<=1);
+});
+
+import {exampleThermal,growingDegreeDays,validThermal} from './phenology.ts';
+test('thermal clock clamps daily mean and rejects inverted thresholds',()=>{
+ assert.equal(growingDegreeDays(-8,-2,exampleThermal),0);
+ assert.equal(growingDegreeDays(10,20,exampleThermal),15);
+ assert.equal(growingDegreeDays(40,50,exampleThermal),30);
+ assert.equal(validThermal({...exampleThermal,base:30,upper:0}),false);
+ assert.equal(validThermal({...exampleThermal,horizonDays:366}),false);
+});
+test('thermal development delays cold crops and never declares data-end maturity',()=>{
+ const source=demoData('2024-04-01',30);
+ const profile={...defaultWheat,thermal:{...exampleThermal,stages:[50,50,50,50] as [number,number,number,number]}};
+ const cold={...source,days:source.days.map(d=>({...d,min:-4,max:0,temp:-2,et0:2}))};
+ const coldRows=analyze(cold,'2027-04-01','wheat','loam',0,{wheat:profile,irrigationEvents:[]});
+ assert.equal(coldRows.length,30);assert.ok(coldRows.every(r=>r.developmentProgress===0&&r.stage===0&&!r.cycleComplete));
+ assert.ok(coldRows.every(r=>r.rootDepth===profile.initialRootDepth));
+ const warm={...source,days:source.days.map(d=>({...d,min:5,max:15,temp:10,et0:2}))};
+ const rows=analyze(warm,'2027-04-01','wheat','loam',0,{wheat:profile,automaticIrrigation:true});
+ assert.equal(rows.length,20);assert.equal(rows.at(-1)!.gddTotal,200);assert.equal(rows.at(-1)!.cycleComplete,true);
+ assert.equal(rows.at(-1)!.developmentProgress,1);assert.equal(rows.at(-1)!.grossIrrigation,0);
+ assert.ok(rows.some(r=>r.stage===1));assert.ok(rows.some(r=>r.stage===2));
+ for(const r of rows)assert.ok(Math.abs(r.previousStorage+r.rootAccessWater+r.effectiveRain+r.netIrrigation-r.actual-r.drain-r.storage)<1e-9);
+ const events=rows.filter(r=>r.grossIrrigation>0).map(r=>({date:r.date,mm:r.grossIrrigation}));
+ const replay=analyze(warm,'2027-04-01','wheat','loam',0,{wheat:profile,irrigationEvents:events});
+ assert.deepEqual(replay.map(r=>[r.storage,r.stage,r.developmentProgress]),rows.map(r=>[r.storage,r.stage,r.developmentProgress]));
 });
