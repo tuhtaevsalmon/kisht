@@ -2,6 +2,28 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {analyze,demoData,parseNASA,addDays} from './domain.ts';
 import {referenceET,defaultWheat,wheatKc,wheatStage} from './evapotranspiration.ts';
+import {seasonLength} from './season.ts';
+import {windowDates,parseYear} from './climate.ts';
+test('full wheat cycle includes late-stage days, final irrigation and year boundaries',()=>{
+ const duration=seasonLength('wheat');assert.equal(duration,135);
+ const start='2027-11-01',end=addDays(start,duration-1);
+ const data=demoData('2024-11-01',duration);
+ const rows=analyze(data,start,'wheat','loam',0,{irrigationEvents:[{date:end,mm:20}]});
+ assert.equal(rows.length,135);assert.equal(rows.at(-1)!.date,end);assert.equal(rows.at(-1)!.stage,3);assert.equal(rows.at(-1)!.grossIrrigation,20);
+ assert.deepEqual([0,1,2,3].map(stage=>rows.filter(r=>r.stage===stage).length),defaultWheat.stages);
+ const w=windowDates(start,2024,duration);assert.equal(w.end,addDays('2024-11-01',148));
+ assert.equal(seasonLength('corn',defaultWheat,160),160);
+ assert.throws(()=>demoData(start,366));assert.throws(()=>parseNASA({},start,0));
+});
+test('NASA full-cycle parsing rejects a missing final day in comparison windows',()=>{
+ const duration=135,start='2024-03-18',parameter:any={};
+ for(const name of ['T2M','T2M_MIN','T2M_MAX','PRECTOTCORR','ALLSKY_SFC_SW_DWN'])parameter[name]=Object.fromEntries(Array.from({length:duration+28},(_,i)=>[addDays(start,i).replaceAll('-',''),10]));
+ const payload={properties:{parameter}};
+ const sample=parseYear(payload,'2027-04-01',2024,'test','test',duration);
+ assert.deepEqual(sample.sources.map(s=>s.days.length),[135,135,135]);
+ delete parameter.T2M[addDays(start,duration+27).replaceAll('-','')];
+ assert.throws(()=>parseYear(payload,'2027-04-01',2024,'test','test',duration));
+});
 test('FAO-56 worked example 18 gives approximately 3.88 mm/day',()=>{
  const ea=1.409,log=Math.log(ea/.6108),dew=237.3*log/(17.27-log);
  const et=referenceET({date:'2023-07-06',min:12.3,max:21.5,dew,wind:2.078,pressure:100.1,solarMJ:22.07,latitude:50.8,elevation:100});
