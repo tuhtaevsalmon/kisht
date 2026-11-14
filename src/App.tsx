@@ -35,11 +35,11 @@ export default function App(){
  const [wheat,setWheat]=useState<WheatProfile>(validWheat(initial.wheat)?{...initial.wheat,thermal:undefined}:{...defaultWheat});
  const [events,setEvents]=useState<IrrigationEvent[]>(validEvents(initial.events)?initial.events:[]);
  const [year,setYear]=useState([2020,2021,2022,2023,2024].includes(initial.year)?initial.year:2024),[day,setDay]=useState(0),[playing,setPlaying]=useState(false),[cut,setCut]=useState(false);
- const [loaded,setLoaded]=useState<{key:string;data:SourceData}|null>(null);
+ const [loaded,setLoaded]=useState<{key:string;data:SourceData;origin:'manual'|'plan'}|null>(null);
  const [forecast,setForecast]=useState<{key:string;data:ForecastData}|null>(null);
  const [terrainData,setTerrainData]=useState<{key:string;data:Terrain}|null>(null);
  const [status,setStatus]=useState<Record<'nasa'|'forecast'|'terrain',Status>>({nasa:'idle',forecast:'idle',terrain:'idle'});
- const [loading,setLoading]=useState(false);const request=useRef<AbortController|null>(null);
+ const [loading,setLoading]=useState(false);const request=useRef<AbortController|null>(null),supplementalRequest=useRef<AbortController|null>(null);
  const t=(a:string,b:string)=>lang==='ru'?a:b;
  const coord=plot.length?center(plot):[38.53,68.55],area=validPolygon(plot)?areaHa(plot):0;
  const duration=seasonLength('wheat',wheat),locationKey=`${coord[0].toFixed(6)}:${coord[1].toFixed(6)}`;
@@ -52,42 +52,46 @@ export default function App(){
  const options=useMemo(()=>({wheat,irrigationEvents:events,efficiency,initialStorage:initialStorage/100,weeklyLimit:waterLimit!==''&&area>0?Number(waterLimit)/(area*10):undefined}),[wheat,events,efficiency,initialStorage,waterLimit,area]);
  const rows=useMemo(()=>data?analyze(data,planting,'wheat',soil,0,options):[],[data,planting,soil,options]);
  const selected=Math.min(day,Math.max(0,rows.length-1)),current=rows[selected];
+ const riskStarts=useMemo(()=>rows.flatMap((r,i)=>(['waterRisk','heat','frost'] as const).some(k=>r[k]&&(i===0||!rows[i-1][k]))?[i]:[]),[rows]);
+ const nextRisk=riskStarts.find(i=>i>selected)??riskStarts[0];
  const fmt=(date:string)=>new Intl.DateTimeFormat(lang==='ru'?'ru-RU':'en-GB',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'}).format(new Date(date+'T12:00:00Z'));
  useEffect(()=>{document.documentElement.lang=lang;document.title=lang==='en'?'Kisht — your field lab':'Кишт — лаборатория поля';try{localStorage.setItem('kisht-field-v2',JSON.stringify({lang,plot,planting,crop:'wheat',soil,method,initialStorage,waterLimit,wheat,events,year}))}catch{}},[lang,plot,planting,soil,method,initialStorage,waterLimit,wheat,events,year]);
- useEffect(()=>{request.current?.abort();request.current=null;setLoading(false);setStatus({nasa:'idle',forecast:'idle',terrain:'idle'});setPlaying(false);setDay(0)},[key,JSON.stringify(plot)]);
- useEffect(()=>()=>request.current?.abort(),[]);
+ useEffect(()=>{request.current?.abort();request.current=null;supplementalRequest.current?.abort();supplementalRequest.current=null;setLoading(false);setStatus({nasa:'idle',forecast:'idle',terrain:'idle'});setPlaying(false);setDay(0)},[key,JSON.stringify(plot)]);
+ useEffect(()=>()=>{request.current?.abort();supplementalRequest.current?.abort()},[]);
  useEffect(()=>{window.scrollTo({top:0,behavior:'instant'});setPlaying(false)},[tab]);
  useEffect(()=>{if(!playing)return;const timer=setInterval(()=>setDay(d=>{if(d>=rows.length-1){setPlaying(false);return d}return d+1}),350);return()=>clearInterval(timer)},[playing,rows.length]);
  async function load(){
-  if(!usable)return;request.current?.abort();const c=new AbortController();request.current=c;
+  if(!usable)return;request.current?.abort();supplementalRequest.current?.abort();supplementalRequest.current=null;const c=new AbortController();request.current=c;
   setLoading(true);setPlaying(false);setDay(0);setLoaded(null);setForecast(null);setTerrainData(null);
   setStatus({nasa:'loading',forecast:'loading',terrain:'loading'});setTab('analysis');
   const timer=setTimeout(()=>c.abort(),60000);const fresh=()=>request.current===c;
   const run=async(name:'nasa'|'forecast'|'terrain',work:()=>Promise<void>)=>{try{await work();if(fresh())setStatus(s=>({...s,[name]:'ready'}))}catch{if(fresh())setStatus(s=>({...s,[name]:'error'}))}};
   await Promise.allSettled([
-   run('nasa',async()=>{const result=await loadNASA({lat:coord[0],lon:coord[1],planting,year,duration,signal:c.signal});if(fresh())setLoaded({key,data:result})}),
+   run('nasa',async()=>{const result=await loadNASA({lat:coord[0],lon:coord[1],planting,year,duration,signal:c.signal});if(fresh())setLoaded({key,data:result,origin:'manual'})}),
    run('forecast',async()=>{const result=await loadForecast({lat:coord[0],lon:coord[1],signal:c.signal});if(fresh())setForecast({key:locationKey,data:result})}),
    run('terrain',async()=>{const result=await loadTerrain(plot,c.signal);if(fresh())setTerrainData({key:terrainKey(plot),data:result})})
-  ]);clearTimeout(timer);if(fresh())setLoading(false);
+  ]);clearTimeout(timer);if(fresh()){request.current=null;setLoading(false)}
  }
  // A plan can be applied directly from Recommendations before a manual data load.
  useEffect(()=>{
-  if(!data)return;
-  let alive=true;const c=new AbortController();const timer=setTimeout(()=>c.abort(),35000);
-  if(!terrain&&status.terrain!=='loading'){
+  if(!data||loaded?.origin!=='plan'||(terrain&&weather))return;
+  const c=new AbortController();supplementalRequest.current=c;
+  const ownsRequest=()=>supplementalRequest.current===c;
+  const timer=setTimeout(()=>c.abort(),35000);
+  if(!terrain){
    setStatus(s=>({...s,terrain:'loading'}));
-   void loadTerrain(plot,c.signal).then(result=>{if(!c.signal.aborted){setTerrainData({key:terrainKey(plot),data:result});setStatus(s=>({...s,terrain:'ready'}))}}).catch(()=>{if(alive)setStatus(s=>({...s,terrain:'error'}))});
+   void loadTerrain(plot,c.signal).then(result=>{if(ownsRequest()&&!c.signal.aborted){setTerrainData({key:terrainKey(plot),data:result});setStatus(s=>({...s,terrain:'ready'}))}}).catch(()=>{if(ownsRequest())setStatus(s=>({...s,terrain:'error'}))});
   }
-  if(!weather&&status.forecast!=='loading'){
+  if(!weather){
    setStatus(s=>({...s,forecast:'loading'}));
-   void loadForecast({lat:coord[0],lon:coord[1],signal:c.signal}).then(result=>{if(!c.signal.aborted){setForecast({key:locationKey,data:result});setStatus(s=>({...s,forecast:'ready'}))}}).catch(()=>{if(alive)setStatus(s=>({...s,forecast:'error'}))});
+   void loadForecast({lat:coord[0],lon:coord[1],signal:c.signal}).then(result=>{if(ownsRequest()&&!c.signal.aborted){setForecast({key:locationKey,data:result});setStatus(s=>({...s,forecast:'ready'}))}}).catch(()=>{if(ownsRequest())setStatus(s=>({...s,forecast:'error'}))});
   }
-  return()=>{alive=false;clearTimeout(timer);c.abort()};
- },[data,locationKey,JSON.stringify(plot)]);
+  return()=>{if(ownsRequest())supplementalRequest.current=null;clearTimeout(timer);c.abort()};
+ },[data,loaded?.origin,locationKey,JSON.stringify(plot)]);
  function applyPlan(date:string,next:IrrigationEvent[],source:SourceData,sourceYear:number){
   if(source.kind!=='nasa'||source.days.some(d=>!Number.isFinite(d.et0)))return;
-  request.current?.abort();request.current=null;setLoading(false);setPlanting(date);setEvents(next);setYear(sourceYear);
-  setLoaded({key:`${locationKey}:${date}:${sourceYear}:${duration}`,data:source});setDay(0);setPlaying(false);setTab('analysis');
+  request.current?.abort();request.current=null;supplementalRequest.current?.abort();supplementalRequest.current=null;setLoading(false);setPlanting(date);setEvents(next);setYear(sourceYear);
+  setLoaded({key:`${locationKey}:${date}:${sourceYear}:${duration}`,data:source,origin:'plan'});setDay(0);setPlaying(false);setTab('analysis');
  }
  const sourceStatus=(name:'nasa'|'forecast'|'terrain')=>name==='nasa'&&data||name==='forecast'&&weather||name==='terrain'&&terrain?'ready':status[name];
  return <div className="v2-app focused-app"><header className="v2-header"><a className="v2-brand" href="#" onClick={e=>{e.preventDefault();setTab('setup')}}><Sprout/>{t('Кишт','Kisht')}</a><nav aria-label={t('Разделы','Sections')}>{(['setup','analysis','plans','jury'] as Tab[]).map((v,i)=><button key={v} className={tab===v?'active':''} onClick={()=>setTab(v)}>{i<3&&<span>0{i+1}</span>}{({setup:t('Мой участок','My field'),analysis:t('Симуляция','Simulation'),plans:t('Рекомендации','Recommendations'),jury:t('Демо симуляция','Demo simulation')})[v]}</button>)}</nav><button className="language" aria-label="Switch language" onClick={()=>setLang(lang==='ru'?'en':'ru')}>{lang==='ru'?'EN':'RU'}</button></header>
@@ -109,9 +113,9 @@ export default function App(){
  {tab==='analysis'&&<><div className="source-progress" aria-live="polite">{(['nasa','terrain','forecast'] as const).map(name=>{const s=sourceStatus(name);return <div key={name} data-status={s}>{s==='ready'?<Check size={16}/>:s==='loading'?<LoaderCircle size={16} className="spin"/>:<AlertTriangle size={16}/>}<span>{name==='nasa'?'NASA POWER':name==='terrain'?'SRTM':t('Прогноз на 7 дней','7-day forecast')}<small>{s==='ready'?t('Данные получены','Data received'):s==='loading'?t('Загружаем…','Loading…'):s==='error'?t('Недоступно — без подмены','Unavailable — no fallback'):t('Ещё не загружено','Not loaded')}</small></span></div>})}</div>
  {!loading&&(!data||!terrain||!weather)&&<div className="source-retry"><p>{t('Для отсутствующих источников результат не выдумывается. Можно повторить загрузку.','Missing sources are not filled with invented results. You can retry loading.')}</p><button className="primary" onClick={load}>{t('Загрузить данные','Load data')}</button></div>}
  {current&&<><div className="run-context"><b>{t(`Погода NASA ${year} → сценарий вашего посева`,`NASA ${year} weather → your sowing scenario`)}</b><span>{t('Это исторический сценарий, не прогноз всего будущего сезона.','Historical scenario, not a forecast of the entire future season.')}</span></div><div className="analysis-grid"><section className="v2-scene"><div className="scene-heading"><div><span className="eyebrow">{t('ДЕНЬ','DAY')} {selected+1} / {rows.length}</span><h2>{fmt(current.date)}</h2><p>{stageNames[current.stage??0][lang==='ru'?0:1]}</p></div><button className={cut?'active':''} onClick={()=>setCut(!cut)}><Layers size={16}/>{t('Корни','Roots')}</button></div>
- <div className="v2-canvas">{terrain?<Suspense fallback={<p>3D…</p>}><Field terrain={terrain} plot={plot} growth={current.developmentProgress} crop="wheat" moisture={current.moisture} watering={current.grossIrrigation>0} raining={current.rain>0} cut={cut} stress={current.waterRisk} frost={current.frost} waterStress={current.demand>0?1-current.actual/current.demand:0} rootFraction={current.rootDepth===null?undefined:current.rootDepth/wheat.rootDepth} irrigationMethod={method} windSpeed={current.wind??0}/></Suspense>:<div className="terrain-missing"><Layers size={32}/><h3>{t('Ожидаем настоящий рельеф','Waiting for real terrain')}</h3><p>{t('3D участка появится после получения высот SRTM. Расчёты погоды и воды доступны справа.','Your 3D field appears once SRTM elevations arrive. Weather and water calculations are available alongside.')}</p></div>}</div>
+ <div className="v2-canvas">{terrain?<Suspense fallback={<p>3D…</p>}><Field terrain={terrain} plot={plot} growth={current.developmentProgress} crop="wheat" moisture={current.moisture} watering={current.grossIrrigation>0} raining={current.rain>0} cut={cut} stress={current.waterRisk} frost={current.frost} waterStress={current.demand>0?1-current.actual/current.demand:0} rootFraction={current.rootDepth===null?undefined:current.rootDepth/wheat.rootDepth} irrigationMethod={method} windSpeed={current.wind??0}/></Suspense>:<div className="terrain-missing"><Layers size={32}/><h3>{t('Ожидаем настоящий рельеф','Waiting for real terrain')}</h3><p>{t('3D участка появится после получения высот SRTM. Расчёты погоды и воды доступны справа.','Your 3D field appears once SRTM elevations arrive. Weather and water calculations are available alongside.')}</p></div>}{terrain&&<div className="scene-risk-label">{current.waterRisk||current.heat||current.frost?<><AlertTriangle size={15}/>{[current.waterRisk?(current.unmet>1e-6?t('Нехватка воды','Water shortage'):t('Низкий запас воды','Low water reserve')):null,current.heat?t('Жара','Heat'):null,current.frost?t('Заморозок','Frost'):null].filter(Boolean).join(' · ')}</>:<><Check size={15}/>{t('Сигналы риска не выявлены','No tracked risk signals')}</>}</div>}</div>
  <div className="scene-data"><span>{t('Дождь','Rain')}: {current.rain.toFixed(1)} mm</span><span>{t('Полив','Irrigation')}: {current.grossIrrigation.toFixed(1)} mm</span><span>{current.min.toFixed(1)}…{current.max.toFixed(1)} °C</span></div>
- <div className="calendar-timeline"><div><button className="primary" onClick={()=>{if(selected===rows.length-1)setDay(0);setPlaying(!playing)}}>{playing?<Pause size={16}/>:<Play size={16}/>} {playing?t('Пауза','Pause'):t('Проиграть сезон','Play season')}</button>{rows.some(r=>r.waterRisk||r.frost||r.heat)&&<button onClick={()=>{setDay(rows.findIndex(r=>r.waterRisk||r.frost||r.heat));setPlaying(false)}}>{t('Первый риск','First risk')}</button>}</div><input aria-label={t('День сезона','Season day')} type="range" min="0" max={rows.length-1} value={selected} onChange={e=>{setDay(+e.target.value);setPlaying(false)}}/><RiskTimeline rows={rows} day={selected} lang={lang}/></div><small className="scene-footnote">{t('SRTM: реальные высоты, масштаб ×1. Растения и полив — визуализация расчёта, не спутниковое изображение посева.','SRTM: real elevations, scale ×1. Plants and irrigation visualise the model, not satellite imagery of the crop.')}</small></section><DayStatus rows={rows} row={current} day={selected} lang={lang} onPlan={()=>setTab('plans')}/></div>
+ <div className="calendar-timeline"><div><button className="primary" onClick={()=>{if(selected===rows.length-1)setDay(0);setPlaying(!playing)}}>{playing?<Pause size={16}/>:<Play size={16}/>} {playing?t('Пауза','Pause'):t('Проиграть сезон','Play season')}</button>{nextRisk!==undefined&&<button onClick={()=>{setDay(nextRisk);setPlaying(false)}}>{t('Следующий риск','Next risk')} · {fmt(rows[nextRisk].date)}</button>}</div><input aria-label={t('День сезона','Season day')} type="range" min="0" max={rows.length-1} value={selected} onChange={e=>{setDay(+e.target.value);setPlaying(false)}}/><RiskTimeline rows={rows} day={selected} lang={lang}/></div><small className="scene-footnote">{t('SRTM: реальные высоты, масштаб ×1. Растения и полив — визуализация расчёта, не спутниковое изображение посева.','SRTM: real elevations, scale ×1. Plants and irrigation visualise the model, not satellite imagery of the crop.')}</small></section><DayStatus rows={rows} row={current} day={selected} lang={lang} onPlan={()=>setTab('plans')}/></div>
  {cut&&<RootZonePanel row={current} lang={lang}/>}<StageSummary rows={rows} crop="wheat" lang={lang} onDay={n=>{setDay(n);setPlaying(false)}}/><details className="v2-panel calculation-details"><summary>{t('Почему получился такой результат? Расчёт и источники','Why this result? Calculations and sources')}</summary><DailyExplanation row={current} lang={lang}/><DemandPanel row={current} profile={wheat} lang={lang}/><p>{t('Сорт, почва и начальная влажность требуют проверки на поле. Не рассчитываются болезни, питание, гибель и урожайность.','Cultivar, soil and initial moisture need field validation. Disease, nutrients, mortality and yield are not calculated.')}</p><a href={data!.url} target="_blank" rel="noreferrer">NASA POWER · JSON ↗</a><p>{data!.start} — {data!.end} · {t('Получено','Retrieved')}: {new Date(data!.fetchedAt).toLocaleString()}</p>{terrain&&<a href={terrain.url} target="_blank" rel="noreferrer">NASA SRTM · JSON ↗</a>}</details></>}
  {weather&&<section className="v2-panel forecast-panel"><h2>{t('Ближайшая погода — реальные даты','Upcoming weather — actual dates')}</h2><p>{t('Этот прогноз помогает ближайшим действиям. Он не подменяет погоду всего сезона.','Use this forecast for near-term decisions. It does not replace the full-season historical scenario.')}</p><div className="forecast-days">{weather.days.map(d=><div key={d.date}><small>{fmt(d.date)}</small><b>{d.min.toFixed(0)}…{d.max.toFixed(0)} °C</b><span>{d.rain.toFixed(1)} mm</span></div>)}</div><small><a href={weather.url} target="_blank" rel="noreferrer">Open-Meteo · CC BY 4.0 ↗</a></small></section>}</>}
  </>}</>}
