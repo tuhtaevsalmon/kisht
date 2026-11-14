@@ -54,3 +54,17 @@ test('date comparison applies the same irrigation constraints as the field',()=>
  const compared=compareDates([{year:2024,sources}],'2027-04-01','wheat','loam',45,options);
  assert.equal(compared[1].water!.median,analyze(sources[1],'2027-04-01','wheat','loam',45,options).filter(r=>r.waterRisk).length);
 });
+
+import {stressHistory} from './stressHistory.ts';
+test('elapsed water stress survives rewatering and excludes future deficits',()=>{
+ const source=demoData('2024-04-01',4);
+ source.days=source.days.map((d,i)=>({...d,rain:i===2?200:0}));
+ const rows=analyze(source,'2027-04-01','corn','sand',0,{initialStorage:0,irrigationEvents:[]});
+ const dry=stressHistory(rows,1),rewatered=stressHistory(rows,2);
+ assert.equal(dry.limitedDays,2);assert.equal(dry.currentStreak,2);
+ assert.equal(rewatered.currentStreak,0);assert.equal(rewatered.limitedDays,2);
+ assert.ok(Math.abs(rewatered.unmet-dry.unmet)<1e-9);
+ assert.equal(stressHistory(rows,0).limitedDays,1);
+ assert.equal(stressHistory(rows,-1).unmet,0);
+ assert.ok(rewatered.coverage>=0&&rewatered.coverage<=1);
+});
