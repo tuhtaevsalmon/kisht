@@ -4,6 +4,33 @@ import {analyze,demoData,parseNASA,addDays} from './domain.ts';
 import {referenceET,defaultWheat,wheatKc,wheatStage} from './evapotranspiration.ts';
 import {seasonLength} from './season.ts';
 import {windowDates,parseYear} from './climate.ts';
+import {rootDepthAt,rootStress} from './rootZone.ts';
+import {rotationCandidates,rotationDates,rotationIndicators,type RotationPlan} from './rotation.ts';
+test('rotation keeps current plan, creates distinct alternatives and counts family continuity',()=>{
+ for(const crop of ['wheat','corn','legume'] as const){const base:RotationPlan=[crop,crop,crop],plans=rotationCandidates(base);assert.deepEqual(plans[0],base);assert.equal(new Set(plans.map(p=>p.join(','))).size,3);}
+ const dates=rotationDates('2028-02-29');assert.deepEqual(dates,['2028-02-29','2029-02-28','2030-02-28']);
+ const stats=rotationIndicators(['wheat','corn','legume'],'wheat',rotationDates('2027-04-01'),[135,120,120]);
+ assert.equal(stats.repeats,1);assert.equal(stats.familyRepeats,2);assert.equal(stats.legumeSeasons,1);assert.deepEqual(stats.gaps,[231,245]);
+});
+test('root growth is bounded and accessible water is transferred once, not created by irrigation',()=>{
+ assert.equal(rootDepthAt(0,defaultWheat),.2);assert.equal(rootDepthAt(45,defaultWheat),1);assert.equal(rootDepthAt(134,defaultWheat),1);
+ const d=demoData('2024-04-01',135);d.days=d.days.map(r=>({...r,rain:0}));
+ const rows=analyze(d,'2027-04-01','wheat','loam',0,{initialStorage:.5,irrigationEvents:[]});
+ const access=rows.reduce((s,r)=>s+r.rootAccessWater,0);
+ assert.ok(Math.abs(access-44)<1e-9);
+ assert.ok(Math.abs(rows[0].previousStorage+access-rows.reduce((s,r)=>s+r.actual+r.drain,0)-rows.at(-1)!.storage)<1e-9);
+ for(let i=1;i<rows.length;i++){assert.equal(rows[i].previousStorage,rows[i-1].storage);assert.ok(Math.abs(rows[i].opening-rows[i].previousStorage-rows[i].rootAccessWater)<1e-9);}
+ const dry=analyze(d,'2027-04-01','wheat','loam',0,{initialStorage:0,irrigationEvents:[]});assert.ok(dry.every(r=>r.storage===0&&r.rootAccessWater===0&&r.actual===0));
+});
+test('FAO Ks is one above RAW, decreases before wilting and responds to rain',()=>{
+ assert.equal(rootStress(60,100,5,.55).ks,1);
+ assert.ok(Math.abs(rootStress(22.5,100,5,.55).ks-.5)<1e-9);
+ assert.equal(rootStress(0,100,5,.55).ks,0);
+ const data=demoData('2024-04-01',3);data.days=data.days.map((r,i)=>({...r,rain:i===1?50:0,et0:5}));
+ const rows=analyze(data,'2027-04-01','wheat','loam',0,{initialStorage:.05,irrigationEvents:[]});
+ assert.ok(rows[0].ks<1&&rows[0].storage>0&&rows[0].actual<rows[0].demand);
+ assert.equal(rows[1].ks,1);assert.equal(rows[1].actual,rows[1].demand);
+});
 test('full wheat cycle includes late-stage days, final irrigation and year boundaries',()=>{
  const duration=seasonLength('wheat');assert.equal(duration,135);
  const start='2027-11-01',end=addDays(start,duration-1);

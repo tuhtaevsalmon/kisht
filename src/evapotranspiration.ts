@@ -17,9 +17,9 @@ export function referenceET(w:WeatherET):number|null{
  const et=(.408*delta*rn+gamma*900/(temp+273)*w.wind*(es-ea))/(delta+gamma*(1+.34*w.wind));
  return Number.isFinite(et)?Math.max(0,et):null;
 }
-export interface WheatProfile {stages:[number,number,number,number];kc:[number,number,number];rootDepth:number;availableWater:number}
+export interface WheatProfile {stages:[number,number,number,number];kc:[number,number,number];rootDepth:number;availableWater:number;initialRootDepth?:number;depletionFraction?:number}
 // FAO-56 Table 11 March/April 35–45° latitude example; not locally calibrated.
-export const defaultWheat:WheatProfile={stages:[20,25,60,30],kc:[.3,1.15,.3],rootDepth:1,availableWater:110};
-export function validWheat(p:WheatProfile){return p&&Array.isArray(p.stages)&&p.stages.length===4&&p.stages.every(n=>Number.isInteger(n)&&n>=1&&n<=180)&&p.stages.reduce((s,n)=>s+n,0)<=365&&Array.isArray(p.kc)&&p.kc.length===3&&p.kc.every(n=>Number.isFinite(n)&&n>=.1&&n<=2)&&Number.isFinite(p.rootDepth)&&p.rootDepth>=.1&&p.rootDepth<=2&&Number.isFinite(p.availableWater)&&p.availableWater>=20&&p.availableWater<=250}
+export const defaultWheat:WheatProfile={stages:[20,25,60,30],kc:[.3,1.15,.3],rootDepth:1,availableWater:110,initialRootDepth:.2,depletionFraction:.55};
+export function validWheat(p:WheatProfile){return p&&Array.isArray(p.stages)&&p.stages.length===4&&p.stages.every(n=>Number.isInteger(n)&&n>=1&&n<=180)&&p.stages.reduce((s,n)=>s+n,0)<=365&&Array.isArray(p.kc)&&p.kc.length===3&&p.kc.every(n=>Number.isFinite(n)&&n>=.1&&n<=2)&&Number.isFinite(p.rootDepth)&&p.rootDepth>=.1&&p.rootDepth<=2&&Number.isFinite(p.availableWater)&&p.availableWater>=20&&p.availableWater<=250&&(p.initialRootDepth===undefined||Number.isFinite(p.initialRootDepth)&&p.initialRootDepth>=.05&&p.initialRootDepth<=p.rootDepth)&&(p.depletionFraction===undefined||Number.isFinite(p.depletionFraction)&&p.depletionFraction>=.1&&p.depletionFraction<=.8)}
 export function wheatStage(day:number,p:WheatProfile){let end=0;for(let stage=0;stage<4;stage++){end+=p.stages[stage];if(day<end)return stage}return 4}
 export function wheatKc(day:number,p:WheatProfile){const [a,b,c,d]=p.stages,[ini,mid,end]=p.kc;if(day<a)return ini;if(day<a+b)return ini+(mid-ini)*(day-a)/b;if(day<a+b+c)return mid;if(day<a+b+c+d)return mid+(end-mid)*(day-a-b-c)/d;return 0}
