@@ -5,12 +5,26 @@ import {referenceET,defaultCorn,defaultPotato,defaultWheat,wheatKc,wheatStage} f
 import {seasonLength} from './season.ts';
 import {windowDates,parseYear} from './climate.ts';
 import {rootDepthAt,rootStress} from './rootZone.ts';
-import {rotationCandidates,rotationDates,rotationIndicators,type RotationPlan} from './rotation.ts';
+import {rankPlans,rotationCandidates,rotationDates,rotationIndicators,type RotationPlan} from './rotation.ts';
 test('rotation keeps current plan, creates distinct alternatives and counts family continuity',()=>{
  for(const crop of ['wheat','corn','legume'] as const){const base:RotationPlan=[crop,crop,crop],plans=rotationCandidates(base);assert.deepEqual(plans[0],base);assert.equal(new Set(plans.map(p=>p.join(','))).size,3);}
  const dates=rotationDates('2028-02-29');assert.deepEqual(dates,['2028-02-29','2029-02-28','2030-02-28']);
  const stats=rotationIndicators(['wheat','corn','legume'],'wheat',rotationDates('2027-04-01'),[135,120,120]);
  assert.equal(stats.repeats,1);assert.equal(stats.familyRepeats,2);assert.equal(stats.legumeSeasons,1);assert.deepEqual(stats.gaps,[231,245]);
+});
+test('farmer priority reorders plans and keeps a tie in the original order',()=>{
+ const plans=[
+  {id:'yours',soilScore:49,extraGap:111,totalGap:471},
+  {id:'legume',soilScore:100,extraGap:120,totalGap:480},
+  {id:'corn',soilScore:100,extraGap:100,totalGap:460},
+ ];
+ assert.deepEqual(rankPlans(plans,'water').map(plan=>plan.id),['yours','legume','corn']);
+ assert.deepEqual(rankPlans(plans,'soil').map(plan=>plan.id),['legume','corn','yours']);
+ assert.deepEqual(rankPlans(plans,'cover').map(plan=>plan.id),['corn','yours','legume']);
+ const measured=plans.map(plan=>({...plan,waterRiskDays:plan.id==='yours'?50:plan.id==='legume'?30:30,unmetMm:plan.id==='corn'?4:9,irrigationMm:plan.id==='corn'?80:10}));
+ assert.deepEqual(rankPlans(measured,'water').map(plan=>plan.id),['corn','legume','yours']);
+ const tied=[{id:'a',soilScore:80,extraGap:10,totalGap:10},{id:'b',soilScore:80,extraGap:10,totalGap:10}];
+ assert.deepEqual(rankPlans(tied,'soil').map(plan=>plan.id),['a','b']);
 });
 test('root growth is bounded and accessible water is transferred once, not created by irrigation',()=>{
  assert.equal(rootDepthAt(0,defaultWheat),.2);assert.equal(rootDepthAt(45,defaultWheat),1);assert.equal(rootDepthAt(134,defaultWheat),1);
