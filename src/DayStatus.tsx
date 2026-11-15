@@ -2,10 +2,12 @@ import {Droplets,Snowflake,Sun} from 'lucide-react';
 import {stressHistory} from './stressHistory';
 import {cropParams,type CropId,type Lang} from './domain';
 import type {SeasonRow} from './riskEvents';
+import type {FateDay} from './cropFailure';
+import CropFateNote from './CropFateNote';
 import './day-status.css';
 
-interface Props {row:SeasonRow;rows:SeasonRow[];day:number;lang:Lang;onPlan?:()=>void;crop?:CropId;showMeasurements?:boolean}
-export default function DayStatus({row:r,rows,day,lang,onPlan,crop='wheat',showMeasurements=true}:Props){
+interface Props {row:SeasonRow;rows:SeasonRow[];day:number;lang:Lang;onPlan?:()=>void;crop?:CropId;showMeasurements?:boolean;fate?:FateDay}
+export default function DayStatus({row:r,rows,day,lang,onPlan,crop='wheat',showMeasurements=true,fate}:Props){
  const t=(a:string,b:string)=>lang==='ru'?a:b;
  const ratio=r.demand>0?Math.max(0,Math.min(1,r.actual/r.demand)):1;
  const heatThreshold=cropParams[crop].heat;
@@ -14,6 +16,7 @@ export default function DayStatus({row:r,rows,day,lang,onPlan,crop='wheat',showM
  const mm=t('мм','mm');
  return <aside className="day-status selected-day-risks">
   <span className="eyebrow">{t('РИСКИ ВЫБРАННОГО ДНЯ','SELECTED-DAY RISKS')}</span><h2>{date}</h2>
+  {fate?.dead&&fate.diedIndex!==null&&rows[fate.diedIndex]&&<CropFateNote row={rows[fate.diedIndex]} fate={fate} lang={lang} crop={crop}/>}
   <p className="day-risk-count">{count?t(`Сигналов риска: ${count}. Причины ниже.`,`${count} risk signal${count===1?'':'s'}. Causes below.`):t('Сигналов риска нет. Показатели дня ниже.','No risk signals. Today’s readings are below.')}</p>
   <div className="day-risk-list">
    <article className={`day-risk water${r.waterRisk?'':' ok'}`}><h3><Droplets size={18}/>{r.waterRisk?(r.unmet>1e-6?t('Не хватает доступной воды','Available water is limiting uptake'):t('Низкий запас воды','Low water reserve')):t('Воды достаточно','Water is sufficient')}</h3>

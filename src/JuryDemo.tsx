@@ -1,11 +1,13 @@
 import {lazy,Suspense,useEffect,useMemo,useState} from 'react';
-import {Play,Pause,RotateCcw,FlaskConical} from 'lucide-react';
+import {Play,Pause,RotateCcw,FlaskConical,Layers} from 'lucide-react';
 import {analyze,cropLabels,demoData,simulatedCrops,type Lang,type Point} from './domain';
 import {defaultProfiles,type SimulatedCrop} from './evapotranspiration';
 import {seasonLength} from './season';
 import {stageNames} from './WheatSettings';
 import RiskTimeline from './RiskTimeline';
 import DayStatus from './DayStatus';
+import {cropFailure} from './cropFailure';
+import RootZonePanel from './RootZonePanel';
 import type {SeasonRow} from './riskEvents';
 import './jury-demo.css';
 
@@ -30,8 +32,8 @@ export default function JuryDemo({lang}:{lang:Lang}){
   const shared={profile,wheat:profile,initialStorage:.65,efficiency:.9,irrigationEvents:[] as []};
   return [analyze(source,planting,crop,'loam',0,shared),analyze(source,planting,crop,'loam',0,{...shared,automaticIrrigation:true})];
  },[crop,duration,profile]);
- const [scenario,setScenario]=useState(0),[day,setDay]=useState(()=>demoDay(scenarios[0])),[playing,setPlaying]=useState(false);
- const rows=scenarios[scenario],dayIndex=Math.min(day,rows.length-1),row=rows[dayIndex],coverage=row.demand>0?row.actual/row.demand:1;
+ const [scenario,setScenario]=useState(0),[day,setDay]=useState(()=>demoDay(scenarios[0])),[playing,setPlaying]=useState(false),[cut,setCut]=useState(false),[showRootData,setShowRootData]=useState(false);
+ const rows=scenarios[scenario],dayIndex=Math.min(day,rows.length-1),row=rows[dayIndex],fateDays=useMemo(()=>cropFailure(rows,crop),[rows,crop]),todayFate=fateDays[dayIndex],shown=todayFate?.dead&&todayFate.diedIndex!==null?rows[todayFate.diedIndex]:row,coverage=row.demand>0?row.actual/row.demand:1;
  useEffect(()=>{setDay(demoDay(scenarios[0]))},[crop]);
  useEffect(()=>{
   if(!playing)return;
@@ -49,12 +51,14 @@ export default function JuryDemo({lang}:{lang:Lang}){
   </div>
   <div className="jury-demonstration">
    <section className="jury-scene">
-    <div className="jury-scene-heading"><div><span className="eyebrow">{t('ДЕНЬ','DAY')} {dayIndex+1} / {rows.length}</span><h3>{date}</h3><span>{stageNames[row.stage??0][lang==='ru'?0:1]}</span></div><span className="jury-demo-stamp">DEMO</span></div>
-    <div className="jury-canvas"><Suspense fallback={<p>{t('Загружаем 3D…','Loading 3D…')}</p>}><Field irrigationMethod="drip" plot={plot} crop={crop} growth={row.developmentProgress} moisture={row.moisture} rootFraction={row.rootDepth===null?undefined:row.rootDepth/profile.rootDepth} watering={row.grossIrrigation>0} raining={row.rain>0} waterStress={Math.max(0,1-coverage)} stress={row.waterRisk||row.heat||row.frost} frost={row.frost} cut={false}/></Suspense></div>
+    <div className="jury-scene-heading"><div><span className="eyebrow">{t('ДЕНЬ','DAY')} {dayIndex+1} / {rows.length}</span><h3>{date}</h3><span>{stageNames[row.stage??0][lang==='ru'?0:1]}</span></div><div className="scene-tools"><button className={cut?'active':''} aria-pressed={cut} onClick={()=>setCut(value=>{if(!value)setShowRootData(true);return !value})}><Layers size={16}/>{t('Корни','Roots')}</button><button className={showRootData?'active':''} aria-pressed={showRootData} onClick={()=>setShowRootData(value=>!value)}>{t('Данные','Data')}</button><span className="jury-demo-stamp">DEMO</span></div></div>
+    <div className="jury-canvas"><Suspense fallback={<p>{t('Загружаем 3D…','Loading 3D…')}</p>}><Field irrigationMethod="drip" plot={plot} crop={crop} growth={shown.developmentProgress} moisture={row.moisture} rootFraction={shown.rootDepth===null?undefined:shown.rootDepth/profile.rootDepth} watering={row.grossIrrigation>0} raining={row.rain>0} waterStress={Math.max(0,1-coverage)} stress={row.waterRisk||row.heat||row.frost} frost={row.frost} dead={!!todayFate?.dead} cut={cut}/></Suspense></div>
+    {showRootData&&<div className="scene-data"><span>{t('Дождь','Rain')}: {row.rain.toFixed(1)} mm</span><span>{t('Полив','Irrigation')}: {row.grossIrrigation.toFixed(1)} mm</span><span>{row.min.toFixed(1)}…{row.max.toFixed(1)} °C</span></div>}
     <div className="jury-playback"><div><button className="primary" onClick={()=>{if(dayIndex===rows.length-1)setDay(0);setPlaying(current=>!current)}}>{playing?<Pause size={16}/>:<Play size={16}/>} {playing?t('Пауза','Pause'):t('Проиграть сезон','Play season')}</button><button aria-label={t('Вернуться к началу демонстрации','Reset demonstration')} onClick={()=>{setPlaying(false);setScenario(0);if(crop==='wheat')setDay(demoDay(scenarios[0]));else setCrop('wheat')}}><RotateCcw size={17}/></button><span>{t('День','Day')} {dayIndex+1}</span></div><input aria-label={t('День демонстрационного сезона','Demonstration season day')} type="range" min="0" max={rows.length-1} value={dayIndex} onChange={e=>{setDay(+e.target.value);setPlaying(false)}}/><RiskTimeline rows={rows} day={dayIndex} lang={lang}/></div>
    </section>
-   <div className="jury-side"><DayStatus row={row} rows={rows} day={dayIndex} lang={lang} crop={crop}/><p className="jury-method-note">{t('Учебная модель: рост по календарю, водный баланс и три сигнала риска. Наклон листьев обозначает ограничение водой. Это не расчёт гибели или урожая.','Teaching model: calendar development, water balance and three risk signals. Leaf droop illustrates water limitation. This does not calculate mortality or yield.')}</p></div>
+   <div className="jury-side"><DayStatus row={row} rows={rows} day={dayIndex} lang={lang} crop={crop} fate={todayFate}/><p className="jury-method-note">{t('Учебная модель: рост по календарю, водный баланс и три сигнала риска. Наклон листьев обозначает ограничение водой. Если нехватка воды, холод или жара пересекают линию сценария, рост останавливается. Это не измеренная гибель сорта и не урожай.','Teaching model: calendar development, water balance and three risk signals. Leaf droop illustrates water limitation. If water shortage, cold or heat crosses the scenario line, growth stops. This is not a measured cultivar death and not a yield.')}</p></div>
   </div>
+  {showRootData&&<RootZonePanel row={row} lang={lang}/>}
   <p className="jury-demo-footer">{t('В основной вкладке используются загруженные реальные источники. Здесь синтетический набор нужен только для воспроизводимого показа без интернета. Модельный полив заранее знает дождь каждого дня — это сравнение сценариев, а не оперативное назначение полива.','The main workflow uses retrieved real data sources. This synthetic fixture is only for a repeatable offline presentation. Model-scheduled irrigation knows each day’s rain in advance: this is scenario comparison, not an operational irrigation prescription.')}</p>
  </section>;
 }

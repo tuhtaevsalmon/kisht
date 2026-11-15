@@ -5,21 +5,20 @@ import {memo,useRef,useMemo,useEffect,useLayoutEffect} from 'react';
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {type Crop} from './model';
-import {type Point} from './domain';
-import {normalizeField,plantingPositions,inside,type XY} from './fieldGeometry';
+import {areaHa,type Point} from './domain';
+import {cropStand,groundTilt,normalizeField,plantingPositions,inside,type XY} from './fieldGeometry';
 
 const ORBIT_TARGET:[number,number,number]=[0,.22,0];
 /** Continuous growth is shown by instance scale; rebuild mesh only on coarse morphological steps. */
-function geometryStep(progress:number,waterStress:number){
- return (progress<.2?0:progress<.48?1:progress<.72?2:3)*2+(waterStress>.45?1:0);
+function geometryStep(progress:number){
+ return progress<.2?0:progress<.48?1:progress<.72?2:3;
 }
-function geometryProgress(step:number){return [0.12,0.12,0.35,0.35,0.6,0.6,0.85,0.85][step]??0.7}
-function geometryStress(step:number){return step%2?0.7:0.15}
+function geometryProgress(step:number){return [0.12,0.35,0.6,0.85][step]??0.7}
 
 export interface FieldProps {
  waterStress?:number;rootFraction?:number;showFlow?:boolean;terrain?:Terrain;
  growth:number;crop:Crop;moisture:number;watering:boolean;raining:boolean;
- cut:boolean;stress:boolean;plot?:Point[];frost?:boolean;
+ cut:boolean;stress:boolean;plot?:Point[];frost?:boolean;dead?:boolean;
  irrigationMethod?:'surface'|'sprinkler'|'drip';windSpeed?:number;
 }
 type Props=FieldProps;
@@ -40,6 +39,10 @@ function stemBetween(a:THREE.Vector3,b:THREE.Vector3,r:number){
  const d=b.clone().sub(a),g=new THREE.CylinderGeometry(r*.7,r,d.length(),5);
  g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),d.normalize()));
  g.translate((a.x+b.x)/2,(a.y+b.y)/2,(a.z+b.z)/2);return g;
+}
+function withSurface(g:THREE.BufferGeometry,surfaceY:number){
+ const values=new Float32Array(g.attributes.position.count);
+ values.fill(surfaceY);g.setAttribute('surfaceY',new THREE.BufferAttribute(values,1));return g;
 }
 // Tapered, curved blades with a central ridge: schematic morphology, not measured biomass.
 function blade(length:number,width:number,bend:number){
@@ -128,20 +131,26 @@ const PLANT_COLORS:Record<Crop,{leaf:string;fruit:string}>={
  carrot:{leaf:'#3f7a42',fruit:'#e06a22'},cabbage:{leaf:'#4e8f58',fruit:'#d5e7c4'},cucumber:{leaf:'#2e6a3c',fruit:'#4f9a45'},
  alfalfa:{leaf:'#3d7a4a',fruit:'#7a5ea8'},legume:{leaf:'#3f7440',fruit:'#8aaa62'},
 };
-function Crops({positions,terrain,growth,crop,waterStress,frost,windSpeed,raining}:{positions:XY[];terrain?:Terrain;growth:number;crop:Crop;waterStress:number;frost:boolean;windSpeed:number;raining:boolean}){
- const meshes=useRef<(THREE.InstancedMesh|null)[]>([]),age=clamp((growth-.035)/.965);
- const step=geometryStep(growth,waterStress);
- const geometry=useMemo(()=>plantGeometry(crop,geometryProgress(step),geometryStress(step)),[crop,step]);
+function Crops({positions,terrain,growth,crop,waterStress,frost,windSpeed,raining,standScale=1,dead=false}:{positions:XY[];terrain?:Terrain;growth:number;crop:Crop;waterStress:number;frost:boolean;windSpeed:number;raining:boolean;standScale?:number;dead?:boolean}){
+ const meshes=useRef<(THREE.InstancedMesh|null)[]>([]),age=dead?Math.max(.12,clamp((growth-.035)/.965)):clamp((growth-.035)/.965);
+ const step=geometryStep(growth);
+ const geometry=useMemo(()=>plantGeometry(crop,geometryProgress(step),.15),[crop,step]);
  const wave=useMemo(()=>({time:{value:0},wind:{value:0}}),[]);
  const growthBucket=Math.round(clamp(growth)*8)/8,stressBucket=Math.round(clamp(waterStress)*4)/4;
  const colors=useMemo(()=>{
+  if(dead){const brown=new THREE.Color('#6b442c');return [brown.clone().multiplyScalar(.85),brown,brown.clone().multiplyScalar(.7),brown.clone().multiplyScalar(.6)]}
   const green=new THREE.Color(PLANT_COLORS[crop].leaf),gold=new THREE.Color(PLANT_COLORS[crop].fruit);
   green.lerp(gold,crop==='wheat'||crop==='barley'||crop==='rice'?clamp((growthBucket-.68)/.3):0);green.lerp(new THREE.Color('#a78b48'),stressBucket*.22);
   if(frost)green.lerp(new THREE.Color('#a5b8b5'),.65);
   return [green.clone().multiplyScalar(.9),green,gold,gold.clone().multiplyScalar(.9)];
- },[crop,growthBucket,stressBucket,frost]);
- const materials=useMemo(()=>colors.map(color=>{
-  const m=new THREE.MeshStandardMaterial({color,roughness:.9,side:THREE.DoubleSide});
+ },[crop,growthBucket,stressBucket,frost,dead]);
+ const stance=useMemo(()=>positions.map(([x,z],i)=>{
+  const step=.45,tilt=groundTilt(terrainHeight(terrain,x+step,z),terrainHeight(terrain,x-step,z),terrainHeight(terrain,x,z+step),terrainHeight(terrain,x,z-step),step);
+  const crooked=noise(i+5)>.68;
+  return {yaw:noise(i+2)*Math.PI*2,pitch:crooked?(noise(i+8)-.35)*.32:(noise(i+8)-.5)*.07,roll:crooked?(noise(i+9)-.5)*.26:(noise(i+6)-.5)*.05,tilt};
+ }),[positions,terrain]);
+ const materials=useMemo(()=>[0,1,2,3].map(()=>{
+  const m=new THREE.MeshStandardMaterial({color:'#ffffff',roughness:.9,side:THREE.DoubleSide});
   m.onBeforeCompile=shader=>{
    shader.uniforms.uCropTime=wave.time;shader.uniforms.uCropWind=wave.wind;
    shader.vertexShader='uniform float uCropTime;\nuniform float uCropWind;\n'+shader.vertexShader;
@@ -152,22 +161,29 @@ function Crops({positions,terrain,growth,crop,waterStress,frost,windSpeed,rainin
      transformed.z+=cos(uCropTime*.9+phase)*uCropWind*.35*max(position.y,0.0);
     #endif`);
   };m.customProgramCacheKey=()=> 'kisht-crop-wind-v1';return m;
- }),[colors,wave]);
+ }),[wave]);
  useEffect(()=>()=>geometry.forEach(g=>g.dispose()),[geometry]);
  useEffect(()=>()=>materials.forEach(m=>m.dispose()),[materials]);
  useLayoutEffect(()=>{
-  const matrix=new THREE.Matrix4(),q=new THREE.Quaternion(),color=new THREE.Color();
-  const lean=Math.min(.4,waterStress*.48);
+  const matrix=new THREE.Matrix4(),q=new THREE.Quaternion(),local=new THREE.Quaternion(),slope=new THREE.Quaternion(),up=new THREE.Vector3(0,1,0),normal=new THREE.Vector3(),color=new THREE.Color();
+  const stress=dead?1.05:Math.min(.32,waterStress*.4);
   for(let k=0;k<4;k++){
    const mesh=meshes.current[k];if(!mesh)continue;
    positions.forEach(([x,z],i)=>{
-    q.setFromEuler(new THREE.Euler(lean,noise(i+2)*Math.PI*2,lean));
-    const h=Math.max(.025,age)*(.9+noise(i)*.2)*(1-waterStress*.18);
-    matrix.compose(new THREE.Vector3(x,terrainHeight(terrain,x,z)+.018,z),q,new THREE.Vector3(Math.max(.15,Math.sqrt(age)),h,Math.max(.15,Math.sqrt(age))));
+    const pose=stance[i];
+    slope.setFromUnitVectors(up,normal.set(pose.tilt.x,pose.tilt.y,pose.tilt.z).normalize());
+    local.setFromEuler(new THREE.Euler(pose.pitch+stress*(.65+noise(i+4)*.45),pose.yaw,pose.roll));
+    q.copy(slope).multiply(local);
+    const h=Math.max(.025,age)*(.84+noise(i)*.32)*(dead?.45:1-waterStress*.18)*standScale;
+    const width=Math.max(.15,Math.sqrt(age))*standScale;
+    matrix.compose(new THREE.Vector3(x,terrainHeight(terrain,x,z)+.018,z),q,new THREE.Vector3(width,h,width));
     mesh.setMatrixAt(i,matrix);mesh.setColorAt(i,color.setRGB(1,1,1).multiplyScalar((raining?.9:1)*(.9+noise(i+9)*.15)));
-   });mesh.instanceMatrix.needsUpdate=true;if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;mesh.computeBoundingSphere();
+   });mesh.instanceMatrix.needsUpdate=true;if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;
+   const material=mesh.material as THREE.MeshStandardMaterial;
+   if(colors[k])material.color.copy(colors[k]);
   }
- },[positions,terrain,age,waterStress,raining,geometry]);
+ },[positions,terrain,age,waterStress,raining,geometry,standScale,colors,dead,stance]);
+ useLayoutEffect(()=>{meshes.current.forEach(mesh=>mesh?.computeBoundingSphere())},[positions,terrain,geometry]);
  useFrame(({clock})=>{wave.time.value=clock.elapsedTime;wave.wind.value=Math.min(12,Math.max(0,windSpeed))*.016});
  return <>{geometry.map((g,k)=>(g.attributes.position?.count??0)>0?<instancedMesh key={k} ref={r=>{meshes.current[k]=r}} args={[g,materials[k],positions.length]} castShadow receiveShadow visible={age>0}/>:null)}</>;
 }
@@ -215,31 +231,41 @@ function FieldWater({positions,polygon,terrain,watering,raining,method}:{positio
 }
 /** Roots stay under each plant and below the soil surface, inside the block. */
 function SoilProfile({positions,terrain,fraction,crop}:{positions:XY[];terrain?:Terrain;fraction:number;crop:Crop}){
- const geometry=useMemo(()=>{
-  const depth=Math.min(.48,.1+.36*fraction);
+ const model=useMemo(()=>{
+  const depth=.46;
   const tap=crop==='carrot'||crop==='cotton'||crop==='sunflower'||crop==='alfalfa'||crop==='tomato';
   const parts:THREE.BufferGeometry[]=[];
   positions.forEach(([x,z],i)=>{
-   const y=terrainHeight(terrain,x,z);
-   const crown=new THREE.Vector3(x,y-.04,z);
+   const y=terrainHeight(terrain,x,z),crownY=y-.04;
+   const crown=new THREE.Vector3(x,crownY,z);
    const count=tap?1:crop==='potato'?3:4;
    for(let k=0;k<count;k++){
     const ang=k/count*Math.PI*2+i*.7,reach=tap?.02:.04;
-    const tip=new THREE.Vector3(x+Math.cos(ang)*reach,y-.04-depth*(tap?1:.8),z+Math.sin(ang)*reach);
-    parts.push(stemBetween(crown,tip,crop==='carrot'?.022:crop==='potato'?.014:.01));
-    if(crop==='potato'&&k===1){const tuber=sphere(.04,.028,.032,0,0,0);const spot=crown.clone().lerp(tip,.55);tuber.translate(spot.x,spot.y,spot.z);parts.push(tuber)}
+    const tip=new THREE.Vector3(x+Math.cos(ang)*reach,crownY-depth*(tap?1:.8),z+Math.sin(ang)*reach);
+    parts.push(withSurface(stemBetween(crown,tip,crop==='carrot'?.022:crop==='potato'?.014:.01),crownY));
+    if(crop==='potato'&&k===1){const tuber=sphere(.04,.028,.032,0,0,0);const spot=crown.clone().lerp(tip,.55);tuber.translate(spot.x,spot.y,spot.z);parts.push(withSurface(tuber,crownY))}
     for(let j=1;j<=2;j++){
      const origin=crown.clone().lerp(tip,j/3);
      const branch=origin.clone().add(new THREE.Vector3(Math.cos(ang+j)*.02,-.04,Math.sin(ang+j)*.02));
-     parts.push(stemBetween(origin,branch,.003));
+     parts.push(withSurface(stemBetween(origin,branch,.003),crownY));
     }
    }
   });
-  return combine(parts);
- },[positions,terrain,fraction,crop]);
- useEffect(()=>()=>geometry.dispose(),[geometry]);
+  const geometry=combine(parts),pos=geometry.attributes.position,surface=geometry.getAttribute('surfaceY');
+  const rest=new Float32Array(pos?.count??0);
+  if(pos&&surface)for(let i=0;i<pos.count;i++)rest[i]=pos.getY(i)-surface.getX(i);
+  return {geometry,rest};
+ },[positions,terrain,crop]);
+ useEffect(()=>()=>model.geometry.dispose(),[model]);
+ useLayoutEffect(()=>{
+  const {geometry,rest}=model,pos=geometry.attributes.position as THREE.BufferAttribute|undefined,surface=geometry.getAttribute('surfaceY');
+  if(!pos||!surface)return;
+  const scale=Math.min(.48,.1+.36*clamp(fraction))/.46;
+  for(let i=0;i<pos.count;i++)pos.setY(i,surface.getX(i)+rest[i]*scale);
+  pos.needsUpdate=true;geometry.computeBoundingSphere();
+ },[model,fraction]);
  const color=crop==='carrot'?'#e07a2f':crop==='potato'?'#e4d3ae':'#f0e2c6';
- return (geometry.attributes.position?.count??0)>0?<mesh geometry={geometry} renderOrder={1}><meshStandardMaterial color={color} roughness={1}/></mesh>:null;
+ return (model.geometry.attributes.position?.count??0)>0?<mesh geometry={model.geometry} renderOrder={1}><meshStandardMaterial color={color} roughness={1}/></mesh>:null;
 }
 /** Look into the soil only when roots are turned on. Turning them off leaves the camera and the block where they are. */
 function RootCamera({cut}:{cut:boolean}){
@@ -273,8 +299,8 @@ function Fit(){
  },[size.width,size.height,camera]);
  return null;
 }
-function Scene({waterStress=0,rootFraction,growth,crop,moisture,watering,raining,cut,plot=[],frost=false,terrain,showFlow=false,irrigationMethod='surface',windSpeed=0}:Props){
- const polygon=useMemo(()=>normalizeField(plot),[plot]),positions=useMemo(()=>plantingPositions(polygon),[polygon]);
+function Scene({waterStress=0,rootFraction,growth,crop,moisture,watering,raining,cut,plot=[],frost=false,terrain,showFlow=false,irrigationMethod='surface',windSpeed=0,dead=false}:Props){
+ const polygon=useMemo(()=>normalizeField(plot),[plot]),stand=useMemo(()=>cropStand(plot.length?areaHa(plot):0),[plot]),positions=useMemo(()=>plantingPositions(polygon,stand.stepX,stand.stepZ),[polygon,stand]);
  const texture=useMemo(soilTexture,[]);useEffect(()=>()=>texture.dispose(),[texture]);
  const shape=useMemo(()=>{const s=new THREE.Shape();polygon.forEach(([x,z],i)=>{const next=polygon[(i+1)%polygon.length];if(i===0)s.moveTo(x,-z);for(let k=1;k<=8;k++)s.lineTo(x+(next[0]-x)*k/8,-z-(next[1]-z)*k/8)});s.closePath();return s},[polygon]);
  const geo=useMemo(()=>{const g=new THREE.ExtrudeGeometry(shape,{depth:.65,bevelEnabled:false});const a=g.attributes.position;for(let i=0;i<a.count;i++)a.setZ(i,a.getZ(i)+terrainHeight(terrain,a.getX(i),-a.getY(i)));g.computeVertexNormals();return g},[shape,terrain]);
@@ -287,14 +313,12 @@ function Scene({waterStress=0,rootFraction,growth,crop,moisture,watering,raining
  useEffect(()=>()=>{geo.dispose();surface.dispose()},[geo,surface]);
  const wetLook=Math.max(clamp(moisture),raining?.62:0);
  const ground=new THREE.Color('#c6ae86').lerp(new THREE.Color('#4a3424'),wetLook);
- const film=raining?.22:wetLook>.82?(wetLook-.82)*.7:0;
  const arrows=useMemo(()=>{if(!terrain||!showFlow)return [];return terrainDirections(terrain,plot).map(d=>{const y=terrainHeight(terrain,d.x,d.z)+.12;return new THREE.ArrowHelper(new THREE.Vector3(d.dx,0,d.dz),new THREE.Vector3(d.x,y,d.z),.35,0x167dba,.12,.08)})},[terrain,plot,showFlow]);
  useEffect(()=>()=>arrows.forEach(a=>a.dispose()),[arrows]);
  return <><color attach="background" args={[raining?'#e3e8df':'#e9eddf']}/><Fit/><ambientLight intensity={raining?.7:.75}/><hemisphereLight args={['#edf5fa','#756347',raining?.95:1.1]}/><directionalLight position={[-3,7,5]} color={raining?'#f3f1ea':'#fff3d7'} intensity={raining?1.7:2.1} castShadow shadow-mapSize={[1024,1024]} shadow-bias={-.0003} shadow-normalBias={.025} shadow-camera-left={-6} shadow-camera-right={6} shadow-camera-top={6} shadow-camera-bottom={-6}/>{arrows.map((a,i)=><primitive key={i} object={a}/>)}
-  <mesh geometry={geo} position={[0,-.65,0]} rotation={[-Math.PI/2,0,0]} receiveShadow castShadow renderOrder={cut?2:0}>{cut?<meshStandardMaterial key="glass" color="#8d6848" roughness={1} transparent opacity={.38} depthWrite={false} side={THREE.DoubleSide}/>:<meshStandardMaterial key="solid" color={ground.clone().multiplyScalar(.72)} map={texture} roughness={1} side={THREE.DoubleSide}/>}</mesh>
-  <mesh geometry={surface} rotation={[-Math.PI/2,0,0]} receiveShadow renderOrder={cut?3:0}><meshStandardMaterial color={ground} map={texture} bumpMap={texture} bumpScale={wetLook>.6?.012:.028} roughness={wetLook>.55?.42:.98} side={THREE.DoubleSide} polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1}/></mesh>
-  {film>.02&&<mesh geometry={surface} position={[0,.012,0]} rotation={[-Math.PI/2,0,0]} renderOrder={4}><meshPhysicalMaterial color="#6f98a0" transparent opacity={film} roughness={.06} metalness={.04} depthWrite={false}/></mesh>}
-  <Crops positions={positions} terrain={terrain} crop={crop} growth={clamp(growth)} waterStress={clamp(waterStress)} frost={frost} windSpeed={windSpeed} raining={raining}/>
+  <mesh geometry={geo} position={[0,-.65,0]} rotation={[-Math.PI/2,0,0]} receiveShadow castShadow renderOrder={cut?2:0}>{cut?<meshStandardMaterial key="glass" color="#8d6848" roughness={1} metalness={0} transparent opacity={.38} depthWrite={false} side={THREE.DoubleSide}/>:<meshStandardMaterial key="solid" color={ground.clone().multiplyScalar(.72)} map={texture} roughness={1} metalness={0} side={THREE.DoubleSide}/>}</mesh>
+  <mesh geometry={surface} rotation={[-Math.PI/2,0,0]} receiveShadow renderOrder={cut?3:0}><meshStandardMaterial color={ground} map={texture} bumpMap={texture} bumpScale={.02} roughness={1} metalness={0} side={THREE.DoubleSide} polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1}/></mesh>
+  <Crops positions={positions} terrain={terrain} crop={crop} growth={clamp(growth)} waterStress={clamp(waterStress)} frost={frost} windSpeed={windSpeed} raining={raining} standScale={stand.scale} dead={dead}/>
   {cut&&<SoilProfile positions={positions} terrain={terrain} crop={crop} fraction={rootFraction??Math.max(.1,growth)}/>}
   <FieldWater terrain={terrain} positions={positions} polygon={polygon} watering={watering} raining={raining} method={irrigationMethod}/>
   <ContactShadows frames={1} resolution={128} position={[0,-.68,0]} opacity={.3} scale={14} blur={2.5} far={5}/>

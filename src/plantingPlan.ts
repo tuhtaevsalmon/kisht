@@ -81,3 +81,17 @@ export function compareAutomaticPlans(years:PlanYear[],planting:string,soil:Soil
  });
  return candidates.sort((a,b)=>b.completeYears-a.completeYears||a.median.frost-b.median.frost||a.median.heat-b.median.heat||a.median.unmet-b.median.unmet||Math.abs(a.shift)-Math.abs(b.shift)||a.shift-b.shift);
 }
+export type ChoiceReason='only'|'cycles'|'frost'|'heat'|'unmet'|'closer'|'tie';
+export interface ChoiceExplanation {reason:ChoiceReason;tested:number;winner:string;other:string|null;winnerValue:number;otherValue:number|null}
+/** The first difference that put the leading sorted plan ahead of the next tested date. */
+export function explainChoice(plans:readonly PlantingPlan[]):ChoiceExplanation{
+ if(!plans.length)throw Error('No plans to explain');
+ const [winner,next]=plans,tested=plans.length,base={tested,winner:winner.date};
+ if(!next)return {...base,reason:'only',other:null,winnerValue:winner.completeYears,otherValue:null};
+ if(winner.completeYears!==next.completeYears)return {...base,reason:'cycles',other:next.date,winnerValue:winner.completeYears,otherValue:next.completeYears};
+ if(winner.median.frost!==next.median.frost)return {...base,reason:'frost',other:next.date,winnerValue:winner.median.frost,otherValue:next.median.frost};
+ if(winner.median.heat!==next.median.heat)return {...base,reason:'heat',other:next.date,winnerValue:winner.median.heat,otherValue:next.median.heat};
+ if(winner.median.unmet!==next.median.unmet)return {...base,reason:'unmet',other:next.date,winnerValue:winner.median.unmet,otherValue:next.median.unmet};
+ if(Math.abs(winner.shift)!==Math.abs(next.shift))return {...base,reason:'closer',other:next.date,winnerValue:Math.abs(winner.shift),otherValue:Math.abs(next.shift)};
+ return {...base,reason:'tie',other:next.date,winnerValue:winner.shift,otherValue:next.shift};
+}

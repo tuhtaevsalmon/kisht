@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {analyze,demoData,addDays,analogStart,type SourceData} from './domain.ts';
 import {defaultCorn,defaultPotato,defaultWheat} from './evapotranspiration.ts';
 import {seasonLength} from './season.ts';
-import {compareAutomaticPlans,candidateDates,seasonRange,loadPlanYears,type SearchRange,type PlanYear} from './plantingPlan.ts';
+import {compareAutomaticPlans,candidateDates,explainChoice,seasonRange,loadPlanYears,type PlantingPlan,type SearchRange,type PlanYear} from './plantingPlan.ts';
 
 function source(start:string,duration=135):SourceData{const d=demoData(start,duration);return {...d,kind:'nasa',days:d.days.map(w=>({...w,min:10,max:25,temp:18,rain:0,et0:4}))};}
 function fixture(planting='2027-04-01',range?:SearchRange):PlanYear[]{
@@ -81,4 +81,21 @@ test('corn and potato recommendations replay every stage of their complete crop 
   assert.ok(best.replay.events.length>0);
   for(let i=0;i<rows.length;i+=7)assert.ok(rows.slice(i,i+7).reduce((s,r)=>s+r.grossIrrigation,0)<=12+1e-9);
  }
+});
+test('the explanation names the first difference against the next tested date',()=>{
+ const figures=(frost:number,heat=0,unmet=0)=>({water:0,unmet,waterDays:0,heat,frost});
+ const plan=(date:string,shift:number,median:ReturnType<typeof figures>,completeYears=3):PlantingPlan=>({date,shift,years:[],median,completeYears,replay:{...median,complete:completeYears===3,year:2024,source:source(date),events:[],days:1},baseline:median});
+ assert.equal(explainChoice([plan('2027-04-01',0,figures(0))]).reason,'only');
+ assert.equal(explainChoice([plan('2027-04-01',0,figures(1)),plan('2027-04-15',14,figures(4))]).reason,'frost');
+ const heat=explainChoice([plan('2027-04-01',0,figures(0,1)),plan('2027-04-15',14,figures(0,6))]);
+ assert.equal(heat.reason,'heat');assert.equal(heat.other,'2027-04-15');assert.equal(heat.winnerValue,1);assert.equal(heat.otherValue,6);
+ assert.equal(explainChoice([plan('2027-04-01',0,figures(0,0,1)),plan('2027-04-15',14,figures(0,0,3))]).reason,'unmet');
+ assert.equal(explainChoice([plan('2027-04-01',0,figures(0)),plan('2027-03-18',-14,figures(0))]).reason,'closer');
+ const tie=explainChoice([plan('2027-03-18',-14,figures(0)),plan('2027-04-15',14,figures(0))]);
+ assert.equal(tie.reason,'tie');assert.equal(tie.winnerValue,-14);assert.equal(tie.otherValue,14);
+ assert.equal(explainChoice([plan('2027-04-01',0,figures(0),3),plan('2027-04-15',14,figures(0),1)]).reason,'cycles');
+ assert.equal(explainChoice(compareAutomaticPlans(fixture(),'2027-04-01','loam',defaultWheat,{})).reason,'closer');
+ const cold=fixture();cold.forEach(y=>{y.sources[0].days[0].min=-2;y.sources[2].days[0].max=40;});
+ const explained=explainChoice(compareAutomaticPlans(cold,'2027-04-01','loam',defaultWheat,{}));
+ assert.equal(explained.winner,'2027-04-01');assert.equal(explained.reason,'heat');
 });

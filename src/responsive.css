@@ -16,6 +16,10 @@
 .focused-app .source-progress{grid-template-columns:repeat(3,minmax(0,1fr))}
 .focused-app :is(.v2-main,.v2-panel,.field-inputs,.analysis-grid>*,.field-setup>*,.source-progress>*,.source-progress>div>*,.jury-demonstration>*,.auto-plan-choice>*,.season-months>*,.header-tools){min-width:0}
 .focused-app :is(p,small,h1,h2,h3,summary,dd,.run-context,.source-progress,.assistant-applied){overflow-wrap:anywhere}
+.focused-app .water-metrics{grid-template-columns:repeat(auto-fit,minmax(min(100%,132px),1fr))}
+.focused-app .water-metrics article{padding:14px 12px}
+.focused-app .water-metrics :is(small,b){overflow-wrap:normal;word-break:normal}
+.focused-app .water-metrics b{font-size:clamp(18px,2.4vw,25px);white-space:nowrap}
 .focused-app :is(input,select,textarea){max-width:100%}
 .focused-app :is(button,.panel-heading,.scene-heading,.scene-data,.calendar-timeline>div:first-child,.jury-playback>div:first-child,.jury-scene-heading){max-width:100%}
 .focused-app :is(.panel-heading,.scene-heading,.scene-data,.calendar-timeline>div:first-child,.jury-playback>div:first-child,.jury-scene-heading){flex-wrap:wrap}
@@ -38,9 +42,9 @@
  .focused-app .analysis-grid{align-items:stretch}
  .focused-app .analysis-grid>.day-status{align-self:stretch;display:flex;flex-direction:column}
  .focused-app .analysis-grid>.day-status .day-risk-list{flex:1;grid-auto-rows:auto}
- .focused-app .analysis-grid>.day-status .day-risk{display:flex;flex-direction:column;justify-content:center}
+ .focused-app .analysis-grid>.day-status .day-risk{display:flex;flex-direction:column;justify-content:flex-start}
  .focused-app .analysis-grid>.v2-scene{min-height:0}
- .focused-app .analysis-grid .v2-canvas{height:auto;min-height:340px;flex:1 0 340px}
+ .focused-app .analysis-grid .v2-canvas{height:520px;min-height:520px;flex:none}
 }
 @media(max-width:1100px){
  .focused-app .v2-header{height:auto;min-height:85px;flex-wrap:wrap;padding-top:14px;padding-bottom:10px;gap:12px}
@@ -75,4 +79,7 @@
  .focused-app .assistant-launcher{bottom:max(12px,env(safe-area-inset-bottom));right:12px}
  .focused-app .assistant-drawer{left:8px;right:8px;width:auto;bottom:max(8px,env(safe-area-inset-bottom))}
 }
+.scene-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.scene-tools button.active{background:#e5eddb;border-color:#7c9468;color:#2e4d2b}
+.jury-scene .scene-data{display:flex;gap:12px 16px;flex-wrap:wrap;padding:0 24px 8px;font-size:12px}
 
