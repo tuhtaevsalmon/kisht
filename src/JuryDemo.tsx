@@ -5,7 +5,7 @@ import {defaultProfiles,type SimulatedCrop} from './evapotranspiration';
 import {seasonLength} from './season';
 import {stageNames} from './WheatSettings';
 import RiskTimeline from './RiskTimeline';
-import DayStatus from './DayStatus';
+import DayStatus,{DayMeasurements} from './DayStatus';
 import {cropFailure} from './cropFailure';
 import RootZonePanel from './RootZonePanel';
 import type {SeasonRow} from './riskEvents';
@@ -56,8 +56,9 @@ export default function JuryDemo({lang}:{lang:Lang}){
     {showRootData&&<div className="scene-data"><span>{t('Дождь','Rain')}: {row.rain.toFixed(1)} mm</span><span>{t('Полив','Irrigation')}: {row.grossIrrigation.toFixed(1)} mm</span><span>{row.min.toFixed(1)}…{row.max.toFixed(1)} °C</span></div>}
     <div className="jury-playback"><div><button className="primary" onClick={()=>{if(dayIndex===rows.length-1)setDay(0);setPlaying(current=>!current)}}>{playing?<Pause size={16}/>:<Play size={16}/>} {playing?t('Пауза','Pause'):t('Проиграть сезон','Play season')}</button><button aria-label={t('Вернуться к началу демонстрации','Reset demonstration')} onClick={()=>{setPlaying(false);setScenario(0);if(crop==='wheat')setDay(demoDay(scenarios[0]));else setCrop('wheat')}}><RotateCcw size={17}/></button><span>{t('День','Day')} {dayIndex+1}</span></div><input aria-label={t('День демонстрационного сезона','Demonstration season day')} type="range" min="0" max={rows.length-1} value={dayIndex} onChange={e=>{setDay(+e.target.value);setPlaying(false)}}/><RiskTimeline rows={rows} day={dayIndex} lang={lang}/></div>
    </section>
-   <div className="jury-side"><DayStatus row={row} rows={rows} day={dayIndex} lang={lang} crop={crop} fate={todayFate}/><p className="jury-method-note">{t('Учебная модель: рост по календарю, водный баланс и три сигнала риска. Наклон листьев обозначает ограничение водой. Если нехватка воды, холод или жара пересекают линию сценария, рост останавливается. Это не измеренная гибель сорта и не урожай.','Teaching model: calendar development, water balance and three risk signals. Leaf droop illustrates water limitation. If water shortage, cold or heat crosses the scenario line, growth stops. This is not a measured cultivar death and not a yield.')}</p></div>
+   <div className="jury-side"><DayStatus row={row} rows={rows} day={dayIndex} lang={lang} crop={crop} showMeasurements={false} fate={todayFate}/><p className="jury-method-note">{t('Учебная модель: рост по календарю, водный баланс и три сигнала риска. Наклон листьев обозначает ограничение водой. Если нехватка воды, холод или жара пересекают линию сценария, рост останавливается. Это не измеренная гибель сорта и не урожай.','Teaching model: calendar development, water balance and three risk signals. Leaf droop illustrates water limitation. If water shortage, cold or heat crosses the scenario line, growth stops. This is not a measured cultivar death and not a yield.')}</p></div>
   </div>
+  <DayMeasurements row={row} rows={rows} day={dayIndex} lang={lang}/>
   {showRootData&&<RootZonePanel row={row} lang={lang}/>}
   <p className="jury-demo-footer">{t('В основной вкладке используются загруженные реальные источники. Здесь синтетический набор нужен только для воспроизводимого показа без интернета. Модельный полив заранее знает дождь каждого дня — это сравнение сценариев, а не оперативное назначение полива.','The main workflow uses retrieved real data sources. This synthetic fixture is only for a repeatable offline presentation. Model-scheduled irrigation knows each day’s rain in advance: this is scenario comparison, not an operational irrigation prescription.')}</p>
  </section>;

@@ -5,9 +5,10 @@
 .focused-app .setup-advanced>summary,.focused-app .setup-advanced>p{grid-column:1/-1}
 .focused-app .setup-advanced .assumption-fields>label{display:grid;gap:8px;margin:0;align-content:start}
 .focused-app .setup-advanced :is(input,select){width:100%}
-.focused-app .analysis-grid+.day-measurements{padding:20px 24px;margin:0 0 20px;border:1px solid #dce3d5;background:#fbfcf7;border-radius:14px}
+.focused-app :is(.analysis-grid,.jury-demonstration)+.day-measurements{padding:20px 24px;margin:0 0 20px;border:1px solid #dce3d5;background:#fbfcf7;border-radius:14px}
 .focused-app .day-measurements dl{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
-.focused-app .day-measurements dl>div{padding:14px;background:#edf2e5;border-radius:9px}
+.focused-app .day-measurements dl>div{padding:14px;background:#edf2e5;border-radius:9px;min-width:0}
+.focused-app .day-measurements :is(dt,dd){overflow-wrap:normal;word-break:normal}
 .focused-app .day-measurements dd{margin:8px 0 0;font-weight:600;text-align:left}
 .focused-app .day-measurements :is(p,small){font-size:13px;line-height:1.65}
 .focused-app .selected-day-risks .day-risk{min-height:0}
