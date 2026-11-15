@@ -4,7 +4,7 @@ import {cropParams,type CropId,type Lang} from './domain';
 import type {SeasonRow} from './riskEvents';
 import './day-status.css';
 
-interface Props {row:SeasonRow;rows:SeasonRow[];day:number;lang:Lang;onPlan:()=>void;crop?:CropId}
+interface Props {row:SeasonRow;rows:SeasonRow[];day:number;lang:Lang;onPlan?:()=>void;crop?:CropId}
 export default function DayStatus({row:r,rows,day,lang,onPlan,crop='wheat'}:Props){
  const t=(a:string,b:string)=>lang==='ru'?a:b;
  const history=stressHistory(rows,day),ratio=r.demand>0?Math.max(0,Math.min(1,r.actual/r.demand)):1;
@@ -31,7 +31,7 @@ export default function DayStatus({row:r,rows,day,lang,onPlan,crop='wheat'}:Prop
    </article>
   </div>
   <div className="water-gauge"><label>{t('Потребность в воде покрыта','Water demand met')}<b>{r.demand>0?`${Math.round(ratio*100)}%`:'—'}</b></label><meter min="0" max="1" value={ratio}/><small>{r.actual.toFixed(1)} / {r.demand.toFixed(1)} {mm}</small></div>
-  <button className="primary" onClick={onPlan}>{t('Сравнить дату и полив','Compare sowing & irrigation')}</button>
+  {onPlan&&<button className="primary" onClick={onPlan}>{t('Сравнить дату и полив','Compare sowing & irrigation')}</button>}
   <details className="day-risk-details"><summary>{t('Показатели и история дефицита','Measurements & deficit history')}</summary><dl><div><dt>{t('Запас к вечеру','Closing storage')}</dt><dd>{r.storage.toFixed(1)} / {r.storageCapacity.toFixed(1)} {mm}</dd></div><div><dt>{t('Дождь / полив','Rain / irrigation')}</dt><dd>{r.rain.toFixed(1)} / {r.grossIrrigation.toFixed(1)} {mm}</dd></div><div><dt>{t('Температура','Temperature')}</dt><dd>{r.min.toFixed(1)}…{r.max.toFixed(1)} °C</dd></div></dl><p><b>{history.unmet.toFixed(1)} {mm}</b> {t('непокрытой потребности с посева по этот день','unmet demand since sowing through this day')}. {t('Дней с ограниченным потреблением','Days with limited uptake')}: <b>{history.limitedDays}</b>{history.currentStreak>1&&<> · {t('подряд сейчас','consecutive now')}: <b>{history.currentStreak}</b></>}.</p><small>{t('Полив не отменяет прошлый дефицит. Это не процент потери урожая. Исходный день погоды NASA:','Irrigation cannot erase past unmet demand. This is not a yield-loss percentage. NASA source weather day:')} {r.sourceDate}.</small><p className="inline-note">{t('Наклон листьев показывает ограничение водой, светлая окраска — сигнал холода. Болезни, питание и сортовые повреждения не рассчитаны.','Leaf droop illustrates water limitation; pale colour flags cold. Diseases, nutrition and cultivar-specific damage are not modelled.')}</p></details>
  </aside>;
 }
