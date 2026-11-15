@@ -22,10 +22,11 @@ export function referenceET(w:WeatherET):number|null{
 export interface CropProfile {thermal?:ThermalProfile;stages:[number,number,number,number];kc:[number,number,number];rootDepth:number;availableWater:number;initialRootDepth?:number;depletionFraction?:number}
 /** @deprecated Prefer CropProfile — kept for existing imports. */
 export type WheatProfile=CropProfile;
-// FAO-56 Table 11 March/April ~35–45°N examples; not locally calibrated for Tajikistan.
+// Generic example profiles; stage lengths and heat thresholds require local calibration.
+// Wheat: FAO-56 Table 11 spring example. Corn: arid-climate example, not a Tajik cultivar.
 export const defaultWheat:CropProfile={stages:[20,25,60,30],kc:[.3,1.15,.3],rootDepth:1,availableWater:110,initialRootDepth:.2,depletionFraction:.55};
 export const defaultCorn:CropProfile={stages:[25,40,45,30],kc:[.3,1.2,.35],rootDepth:1.2,availableWater:110,initialRootDepth:.2,depletionFraction:.55};
-export const defaultPotato:CropProfile={stages:[25,30,35,20],kc:[.5,1.15,.75],rootDepth:.6,availableWater:110,initialRootDepth:.15,depletionFraction:.35};
+export const defaultPotato:CropProfile={stages:[25,30,45,30],kc:[.5,1.15,.75],rootDepth:.6,availableWater:110,initialRootDepth:.15,depletionFraction:.35};
 // FAO-56 single-crop examples for a full cycle. Not locally calibrated cultivars.
 export const defaultBarley:CropProfile={stages:[15,25,50,30],kc:[.3,1.15,.25],rootDepth:1,availableWater:110,initialRootDepth:.15,depletionFraction:.55};
 export const defaultRice:CropProfile={stages:[30,30,60,30],kc:[1.05,1.2,.9],rootDepth:.5,availableWater:110,initialRootDepth:.1,depletionFraction:.2};

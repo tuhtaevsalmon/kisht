@@ -1,0 +1,58 @@
+{
+  "checkedAt": "2026-11-15T12:17:26.026Z",
+  "location": {
+    "lat": 38.53,
+    "lon": 68.55
+  },
+  "checks": [
+    {
+      "name": "NASA source values and all crop water balances",
+      "status": "passed",
+      "result": {
+        "url": "https://power.larc.nasa.gov/api/temporal/daily/point?parameters=T2M,T2M_MIN,T2M_MAX,PRECTOTCORR,ALLSKY_SFC_SW_DWN,T2MDEW,WS2M,PS&community=AG&longitude=68.550000&latitude=38.530000&start=20240401&end=20240927&format=JSON",
+        "days": 180,
+        "scenarios": 117,
+        "maxResidualMm": 2.842170943040401e-14
+      }
+    },
+    {
+      "name": "Current seven-day forecast",
+      "status": "passed",
+      "result": {
+        "url": "https://api.open-meteo.com/v1/forecast?latitude=38.530000&longitude=68.550000&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&temperature_unit=celsius&precipitation_unit=mm&timezone=Asia%2FDushanbe&forecast_days=7",
+        "start": "2026-11-15",
+        "end": "2026-11-21"
+      }
+    },
+    {
+      "name": "SRTM live elevation grid",
+      "status": "passed",
+      "result": {
+        "source": "SRTM v3 / Open Topo Data",
+        "url": "https://api.opentopodata.org/v1/srtm30m?interpolation=bilinear&locations=38.531000%2C68.550000%7C38.531000%2C68.550167%7C38.531000%2C68.550333%7C38.531000%2C68.550500%7C38.531000%2C68.550667%7C38.531000%2C68.550833%7C38.531000%2C68.551000%7C38.530833%2C68.550000%7C38.530833%2C68.550167%7C38.530833%2C68.550333%7C38.530833%2C68.550500%7C38.530833%2C68.550667%7C38.530833%2C68.550833%7C38.530833%2C68.551000%7C38.530667%2C68.550000%7C38.530667%2C68.550167%7C38.530667%2C68.550333%7C38.530667%2C68.550500%7C38.530667%2C68.550667%7C38.530667%2C68.550833%7C38.530667%2C68.551000%7C38.530500%2C68.550000%7C38.530500%2C68.550167%7C38.530500%2C68.550333%7C38.530500%2C68.550500%7C38.530500%2C68.550667%7C38.530500%2C68.550833%7C38.530500%2C68.551000%7C38.530333%2C68.550000%7C38.530333%2C68.550167%7C38.530333%2C68.550333%7C38.530333%2C68.550500%7C38.530333%2C68.550667%7C38.530333%2C68.550833%7C38.530333%2C68.551000%7C38.530167%2C68.550000%7C38.530167%2C68.550167%7C38.530167%2C68.550333%7C38.530167%2C68.550500%7C38.530167%2C68.550667%7C38.530167%2C68.550833%7C38.530167%2C68.551000%7C38.530000%2C68.550000%7C38.530000%2C68.550167%7C38.530000%2C68.550333%7C38.530000%2C68.550500%7C38.530000%2C68.550667%7C38.530000%2C68.550833%7C38.530000%2C68.551000",
+        "min": 808,
+        "max": 812
+      }
+    },
+    {
+      "name": "Three-year recommendation and exact replay",
+      "status": "passed",
+      "result": {
+        "years": [
+          2022,
+          2023,
+          2024
+        ],
+        "candidateDate": "2027-04-01",
+        "replayYear": 2022,
+        "waterMm": 375,
+        "unmetMm": 288.7470097587846,
+        "urls": [
+          "https://power.larc.nasa.gov/api/temporal/daily/point?parameters=T2M,T2M_MIN,T2M_MAX,PRECTOTCORR,ALLSKY_SFC_SW_DWN,T2MDEW,WS2M,PS&community=AG&latitude=38.530000&longitude=68.550000&start=20220318&end=20220827&format=JSON",
+          "https://power.larc.nasa.gov/api/temporal/daily/point?parameters=T2M,T2M_MIN,T2M_MAX,PRECTOTCORR,ALLSKY_SFC_SW_DWN,T2MDEW,WS2M,PS&community=AG&latitude=38.530000&longitude=68.550000&start=20230318&end=20230827&format=JSON",
+          "https://power.larc.nasa.gov/api/temporal/daily/point?parameters=T2M,T2M_MIN,T2M_MAX,PRECTOTCORR,ALLSKY_SFC_SW_DWN,T2MDEW,WS2M,PS&community=AG&latitude=38.530000&longitude=68.550000&start=20240318&end=20240827&format=JSON"
+        ]
+      }
+    }
+  ]
+}

@@ -54,9 +54,9 @@ test('full wheat cycle includes late-stage days, final irrigation and year bound
  assert.deepEqual([0,1,2,3].map(stage=>rows.filter(r=>r.stage===stage).length),defaultWheat.stages);
  const w=windowDates(start,2024,duration);assert.equal(w.end,addDays('2024-11-01',148));
  assert.equal(seasonLength('corn'),140);
- assert.equal(seasonLength('potato'),110);
+ assert.equal(seasonLength('potato'),130);
  assert.equal(seasonLength('corn',defaultCorn),140);
- assert.equal(seasonLength('potato',defaultPotato),110);
+ assert.equal(seasonLength('potato',defaultPotato),130);
  assert.equal(seasonLength('legume',defaultWheat,160),160);
  assert.throws(()=>demoData(start,366));assert.throws(()=>parseNASA({},start,0));
 });

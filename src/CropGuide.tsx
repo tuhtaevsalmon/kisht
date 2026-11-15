@@ -3,29 +3,16 @@ import {CircleAlert} from 'lucide-react';
 import {cropLabels,simulatedCrops,type IrrigationEvent,type Lang,type SoilId} from './domain';
 import type {CropProfile,SimulatedCrop} from './evapotranspiration';
 import {stageNames} from './WheatSettings';
-import {fieldWater,suggestCrop,weekAction,type ForecastSlice} from './fieldGuide';
+import {fieldWater,suggestCrop,type ForecastSlice} from './fieldGuide';
 import './field-guide.css';
 
-function weekday(date:string,lang:Lang){
- return new Intl.DateTimeFormat(lang==='ru'?'ru-RU':'en-GB',{weekday:'long',day:'numeric',month:'long',timeZone:'UTC'}).format(new Date(date+'T12:00:00Z'));
-}
 function num(n:number){return n>=100?n.toFixed(0):n>=10?n.toFixed(1):n.toFixed(1)}
 
-export function WeekNote({lang,crop,profile,soil,storagePercent,events,days}:{lang:Lang;crop:SimulatedCrop;profile:CropProfile;soil:SoilId;storagePercent:number;events:IrrigationEvent[];days:ForecastSlice[]}){
+export function WeekNote({lang,crop,profile,days}:{lang:Lang;crop:SimulatedCrop;profile:CropProfile;soil:SoilId;storagePercent:number;events:IrrigationEvent[];days:ForecastSlice[]}){
  const t=(ru:string,en:string)=>lang==='ru'?ru:en;
- const action=weekAction(days,crop,profile,soil,storagePercent/100,events);
- const name=cropLabels[crop][lang==='ru'?'ru':'en'];
- const calendarOutside=events.length>0&&!events.some(event=>days.some(day=>day.date===event.date));
- const text=action.kind==='postpone'
-  ?t(`${weekday(action.date,lang)} ожидается ${action.rain.toFixed(1)} мм дождя, ${name} в модели потребляет около ${action.need.toFixed(1)} мм в день. В календаре на эту дату уже ${action.scheduled.toFixed(0)} мм полива — его можно отложить и сверить влажность.`,`${weekday(action.date,lang)}: ${action.rain.toFixed(1)} mm of rain is forecast, and ${name} uses about ${action.need.toFixed(1)} mm/day in the model. The calendar already has ${action.scheduled.toFixed(0)} mm that day — it can be postponed while you check moisture.`)
-  :action.kind==='before-heat'
-  ?action.irrigateOn===action.hotDate
-  ?t(`Первый день прогноза, ${weekday(action.hotDate,lang)}, уже жаркий: максимум ${action.hotMax.toFixed(0)} °C. Запас к утру, с дождём этого дня, около ${action.storage.toFixed(0)} мм — ниже порога модели ${action.threshold.toFixed(0)} мм. Полив лучше поставить на этот день.`,`The first forecast day, ${weekday(action.hotDate,lang)}, is already hot: maximum ${action.hotMax.toFixed(0)} °C. Storage that morning, including that day’s rain, is about ${action.storage.toFixed(0)} mm, below the model threshold of ${action.threshold.toFixed(0)} mm. Irrigation fits better on that day.`)
-  :t(`Перед ${weekday(action.hotDate,lang)} максимум ${action.hotMax.toFixed(0)} °C, а запас к утру, с дождём этого дня, около ${action.storage.toFixed(0)} мм — ниже порога модели ${action.threshold.toFixed(0)} мм. Полив лучше поставить ${weekday(action.irrigateOn,lang)}.`,`Before ${weekday(action.hotDate,lang)} the maximum is ${action.hotMax.toFixed(0)} °C, and storage that morning, including that day’s rain, is about ${action.storage.toFixed(0)} mm, below the model threshold of ${action.threshold.toFixed(0)} mm. Irrigation fits better on ${weekday(action.irrigateOn,lang)}.`)
-  :action.kind==='covered'
-  ?t(`Запас, который вы указали, около ${action.reserveDays.toFixed(0)} дней потребности ${name} (${action.need.toFixed(1)} мм/день). За семь дней прогноз даёт ${action.rainMm.toFixed(0)} мм дождя. Это оценка от вашего процента запаса, не датчик в поле.`,`The storage you entered covers about ${action.reserveDays.toFixed(0)} days of ${name} demand (${action.need.toFixed(1)} mm/day). The seven-day forecast has ${action.rainMm.toFixed(0)} mm of rain. This starts from your storage percentage, not a field sensor.`)
-  :t(`Этого запаса хватает примерно на ${Math.max(0,action.reserveDays).toFixed(1)} дней при ${action.need.toFixed(1)} мм/день. Прогноз добавляет ${action.rainMm.toFixed(0)} мм за неделю — проверьте полив на дни без дождя.`,`This reserve covers about ${Math.max(0,action.reserveDays).toFixed(1)} days at ${action.need.toFixed(1)} mm/day. The forecast adds ${action.rainMm.toFixed(0)} mm over the week — check irrigation on the dry days.`);
- return <div className="week-action"><p>{text}</p>{calendarOutside&&<p>{t('Записи календаря полива стоят на датах сезона и не попадают в эти 7 дней, поэтому прогноз их не переносит.','Irrigation dates belong to the season and do not fall in these 7 days, so the forecast does not move them.')}</p>}</div>;
+ const totalRain=days.reduce((sum,day)=>sum+day.rain,0);
+ const hot=days.filter(day=>day.max>fieldWater(crop,profile,1,1,0).heat);
+ return <div className="week-action"><p>{t(`Прогноз: ${totalRain.toFixed(1)} мм осадков за ${days.length} дней. Дней выше температурного порога модели: ${hot.length}.`,`Forecast: ${totalRain.toFixed(1)} mm of precipitation over ${days.length} days. Days above the model heat threshold: ${hot.length}.`)}</p><p>{t('Перед поливом измерьте влажность корневого слоя и проверьте стадию культуры. Начальный запас воды в сценарии не является влажностью поля сегодня; по нему нельзя назначать или отменять полив на ближайшую неделю.','Before irrigating, measure root-zone moisture and check the crop stage. The scenario’s initial water reserve is not today’s field moisture and cannot justify scheduling or cancelling irrigation this week.')}</p></div>;
 }
 
 export function CropFacts({lang,crop,profile,area,efficiency,storagePercent,waterLimit,onChoose}:{lang:Lang;crop:SimulatedCrop;profile:CropProfile;area:number;efficiency:number;storagePercent:number;waterLimit:string;onChoose:(crop:SimulatedCrop)=>void}){

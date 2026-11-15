@@ -107,7 +107,7 @@ test('thermal development delays cold crops and never declares data-end maturity
 });
 test('corn and potato use FAO-56 profiles with their own season length and heat thresholds',()=>{
  assert.equal(seasonLength('corn',defaultCorn),140);
- assert.equal(seasonLength('potato',defaultPotato),110);
+ assert.equal(seasonLength('potato',defaultPotato),130);
  const withEt0=(planting:string,days:number)=>{
   const source=demoData(planting,days);
   source.days=source.days.map(d=>({...d,et0:3,dew:8,wind:2,pressure:90}));
@@ -135,4 +135,20 @@ test('each simulated crop keeps its own profile, water need and heat threshold',
   assert.ok(cropParams[crop].need>=3);
   assert.ok(cropParams[crop].heat>=28&&cropParams[crop].heat<=40);
  }
+});
+
+
+test('default crop profiles respect soil water capacity without overriding explicit profiles',()=>{
+ const data=demoData('2024-04-01',2);
+ const sand=analyze(data,'2027-04-01','wheat','sand',0);
+ const clay=analyze(data,'2027-04-01','wheat','clay',0);
+ assert.equal(sand[0].storageCapacity,60*.2);
+ assert.equal(clay[0].storageCapacity,145*.2);
+ const custom=analyze(data,'2027-04-01','wheat','sand',0,{profile:{...defaultWheat,availableWater:90}});
+ assert.equal(custom[0].storageCapacity,90*.2);
+});
+test('a real NASA source cannot silently use illustrative demand when ET0 is missing',()=>{
+ const d=demoData('2024-04-01',2);
+ assert.throws(()=>analyze({...d,kind:'nasa'},'2027-04-01','wheat','loam',0),/complete FAO/);
+ assert.equal(analyze(d,'2027-04-01','wheat','loam',0)[0].demandModel,'illustrative');
 });
