@@ -1,0 +1,16 @@
+.header-tools{display:flex;align-items:center;gap:8px}
+.guide-open{white-space:nowrap}
+.farmer-guide{width:min(640px,calc(100vw - 32px));max-height:calc(100vh - 32px);padding:0;border:0;background:transparent;color:#293d32}
+.farmer-guide::backdrop{background:#1d2a2288}
+.farmer-guide article{max-height:calc(100vh - 32px);overflow:auto;padding:22px;background:#f7f8f2;border-radius:16px}
+.farmer-guide header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.farmer-guide h2{margin:0}
+.farmer-guide header button{width:36px;height:36px;padding:0}
+.farmer-guide ol{margin:16px 0 0;padding-left:22px;display:grid;gap:10px}
+.farmer-guide li{font-size:14px;line-height:1.5;color:#314237}
+.guide-split{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}
+.guide-split section{background:#fff;border:1px solid #e1e6d8;border-radius:12px;padding:14px}
+.guide-split h3{margin:0 0 8px}
+.guide-split ul{margin:0;padding-left:18px;display:grid;gap:8px}
+.guide-split li{font-size:13px}
+@media(max-width:760px){.guide-open{padding:8px 10px}.guide-split{grid-template-columns:1fr}}
