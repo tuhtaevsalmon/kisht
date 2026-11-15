@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc -b && vite build && node scripts/build-worker.mjs",
-    "test": "node --experimental-strip-types --test src/model.test.ts src/domain.test.ts src/schedule.test.ts worker/terrain.test.mjs worker/surface.test.mjs src/liveData.test.ts src/autoPlan.test.ts src/assistant.test.ts src/landCover.test.ts src/weatherShift.test.ts worker/chat.test.mjs"
+    "test": "node --experimental-strip-types --test src/model.test.ts src/domain.test.ts src/schedule.test.ts worker/terrain.test.mjs worker/surface.test.mjs src/liveData.test.ts src/autoPlan.test.ts src/assistant.test.ts src/landCover.test.ts src/weatherShift.test.ts src/fieldGuide.test.ts worker/chat.test.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.0.0",

@@ -128,7 +128,7 @@ const PLANT_COLORS:Record<Crop,{leaf:string;fruit:string}>={
  carrot:{leaf:'#3f7a42',fruit:'#e06a22'},cabbage:{leaf:'#4e8f58',fruit:'#d5e7c4'},cucumber:{leaf:'#2e6a3c',fruit:'#4f9a45'},
  alfalfa:{leaf:'#3d7a4a',fruit:'#7a5ea8'},legume:{leaf:'#3f7440',fruit:'#8aaa62'},
 };
-function Crops({positions,terrain,growth,crop,waterStress,frost,windSpeed}:{positions:XY[];terrain?:Terrain;growth:number;crop:Crop;waterStress:number;frost:boolean;windSpeed:number}){
+function Crops({positions,terrain,growth,crop,waterStress,frost,windSpeed,raining}:{positions:XY[];terrain?:Terrain;growth:number;crop:Crop;waterStress:number;frost:boolean;windSpeed:number;raining:boolean}){
  const meshes=useRef<(THREE.InstancedMesh|null)[]>([]),age=clamp((growth-.035)/.965);
  const step=geometryStep(growth,waterStress);
  const geometry=useMemo(()=>plantGeometry(crop,geometryProgress(step),geometryStress(step)),[crop,step]);
@@ -157,18 +157,18 @@ function Crops({positions,terrain,growth,crop,waterStress,frost,windSpeed}:{posi
  useEffect(()=>()=>materials.forEach(m=>m.dispose()),[materials]);
  useLayoutEffect(()=>{
   const matrix=new THREE.Matrix4(),q=new THREE.Quaternion(),color=new THREE.Color();
-  const lean=Math.min(.12,waterStress*.10);
+  const lean=Math.min(.4,waterStress*.48);
   for(let k=0;k<4;k++){
    const mesh=meshes.current[k];if(!mesh)continue;
    positions.forEach(([x,z],i)=>{
     q.setFromEuler(new THREE.Euler(lean,noise(i+2)*Math.PI*2,lean));
-    const h=Math.max(.025,age)*(.9+noise(i)*.2);
+    const h=Math.max(.025,age)*(.9+noise(i)*.2)*(1-waterStress*.18);
     matrix.compose(new THREE.Vector3(x,terrainHeight(terrain,x,z)+.018,z),q,new THREE.Vector3(Math.max(.15,Math.sqrt(age)),h,Math.max(.15,Math.sqrt(age))));
-    mesh.setMatrixAt(i,matrix);mesh.setColorAt(i,color.setRGB(1,1,1).multiplyScalar(.9+noise(i+9)*.15));
+    mesh.setMatrixAt(i,matrix);mesh.setColorAt(i,color.setRGB(1,1,1).multiplyScalar((raining?.9:1)*(.9+noise(i+9)*.15)));
    });mesh.instanceMatrix.needsUpdate=true;if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;mesh.computeBoundingSphere();
   }
- },[positions,terrain,age,waterStress,geometry]);
- useFrame(({clock})=>{wave.time.value=clock.elapsedTime;wave.wind.value=Math.min(15,Math.max(0,windSpeed))*.004});
+ },[positions,terrain,age,waterStress,raining,geometry]);
+ useFrame(({clock})=>{wave.time.value=clock.elapsedTime;wave.wind.value=Math.min(12,Math.max(0,windSpeed))*.016});
  return <>{geometry.map((g,k)=>(g.attributes.position?.count??0)>0?<instancedMesh key={k} ref={r=>{meshes.current[k]=r}} args={[g,materials[k],positions.length]} castShadow receiveShadow visible={age>0}/>:null)}</>;
 }
 function soilTexture(){
@@ -285,14 +285,16 @@ function Scene({waterStress=0,rootFraction,growth,crop,moisture,watering,raining
   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(points,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));g.computeVertexNormals();return g;
  },[shape,terrain]);
  useEffect(()=>()=>{geo.dispose();surface.dispose()},[geo,surface]);
- const moistureKey=Math.round(clamp(moisture)*12);
- const ground=useMemo(()=>new THREE.Color('#9b8058').lerp(new THREE.Color('#55482e'),moistureKey/12),[moistureKey]);
+ const wetLook=Math.max(clamp(moisture),raining?.62:0);
+ const ground=new THREE.Color('#c6ae86').lerp(new THREE.Color('#4a3424'),wetLook);
+ const film=raining?.22:wetLook>.82?(wetLook-.82)*.7:0;
  const arrows=useMemo(()=>{if(!terrain||!showFlow)return [];return terrainDirections(terrain,plot).map(d=>{const y=terrainHeight(terrain,d.x,d.z)+.12;return new THREE.ArrowHelper(new THREE.Vector3(d.dx,0,d.dz),new THREE.Vector3(d.x,y,d.z),.35,0x167dba,.12,.08)})},[terrain,plot,showFlow]);
  useEffect(()=>()=>arrows.forEach(a=>a.dispose()),[arrows]);
- return <><color attach="background" args={['#e9eddf']}/><Fit/><ambientLight intensity={.75}/><hemisphereLight args={['#edf5fa','#756347',1.1]}/><directionalLight position={[-3,7,5]} color="#fff3d7" intensity={2.1} castShadow shadow-mapSize={[1024,1024]} shadow-bias={-.0003} shadow-normalBias={.025} shadow-camera-left={-6} shadow-camera-right={6} shadow-camera-top={6} shadow-camera-bottom={-6}/>{arrows.map((a,i)=><primitive key={i} object={a}/>)}
-  <mesh geometry={geo} position={[0,-.65,0]} rotation={[-Math.PI/2,0,0]} receiveShadow castShadow renderOrder={cut?2:0}>{cut?<meshStandardMaterial key="glass" color="#8d6848" roughness={1} transparent opacity={.38} depthWrite={false} side={THREE.DoubleSide}/>:<meshStandardMaterial key="solid" color="#806544" map={texture} roughness={1} side={THREE.DoubleSide}/>}</mesh>
-  <mesh geometry={surface} rotation={[-Math.PI/2,0,0]} receiveShadow renderOrder={cut?3:0}><meshStandardMaterial color={ground} map={texture} bumpMap={texture} bumpScale={.028} roughness={.98} side={THREE.DoubleSide} polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1}/></mesh>
-  <Crops positions={positions} terrain={terrain} crop={crop} growth={clamp(growth)} waterStress={clamp(waterStress)} frost={frost} windSpeed={windSpeed}/>
+ return <><color attach="background" args={[raining?'#e3e8df':'#e9eddf']}/><Fit/><ambientLight intensity={raining?.7:.75}/><hemisphereLight args={['#edf5fa','#756347',raining?.95:1.1]}/><directionalLight position={[-3,7,5]} color={raining?'#f3f1ea':'#fff3d7'} intensity={raining?1.7:2.1} castShadow shadow-mapSize={[1024,1024]} shadow-bias={-.0003} shadow-normalBias={.025} shadow-camera-left={-6} shadow-camera-right={6} shadow-camera-top={6} shadow-camera-bottom={-6}/>{arrows.map((a,i)=><primitive key={i} object={a}/>)}
+  <mesh geometry={geo} position={[0,-.65,0]} rotation={[-Math.PI/2,0,0]} receiveShadow castShadow renderOrder={cut?2:0}>{cut?<meshStandardMaterial key="glass" color="#8d6848" roughness={1} transparent opacity={.38} depthWrite={false} side={THREE.DoubleSide}/>:<meshStandardMaterial key="solid" color={ground.clone().multiplyScalar(.72)} map={texture} roughness={1} side={THREE.DoubleSide}/>}</mesh>
+  <mesh geometry={surface} rotation={[-Math.PI/2,0,0]} receiveShadow renderOrder={cut?3:0}><meshStandardMaterial color={ground} map={texture} bumpMap={texture} bumpScale={wetLook>.6?.012:.028} roughness={wetLook>.55?.42:.98} side={THREE.DoubleSide} polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1}/></mesh>
+  {film>.02&&<mesh geometry={surface} position={[0,.012,0]} rotation={[-Math.PI/2,0,0]} renderOrder={4}><meshPhysicalMaterial color="#6f98a0" transparent opacity={film} roughness={.06} metalness={.04} depthWrite={false}/></mesh>}
+  <Crops positions={positions} terrain={terrain} crop={crop} growth={clamp(growth)} waterStress={clamp(waterStress)} frost={frost} windSpeed={windSpeed} raining={raining}/>
   {cut&&<SoilProfile positions={positions} terrain={terrain} crop={crop} fraction={rootFraction??Math.max(.1,growth)}/>}
   <FieldWater terrain={terrain} positions={positions} polygon={polygon} watering={watering} raining={raining} method={irrigationMethod}/>
   <ContactShadows frames={1} resolution={128} position={[0,-.68,0]} opacity={.3} scale={14} blur={2.5} far={5}/>

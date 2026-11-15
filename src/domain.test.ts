@@ -25,6 +25,15 @@ test('rain runoff conserves water and does not subtract irrigation losses twice'
  for(const r of rows){assert.ok(Math.abs(r.opening+r.rain+r.grossIrrigation-r.applicationLoss-r.rainRunoff-r.drain-r.actual-r.storage)<1e-9);assert.equal(r.rainRunoff,r.rain*.4);assert.equal(r.effectiveRain,r.rain-r.rainRunoff);assert.ok(Math.abs(r.netIrrigation-1.8)<1e-9)}
  const all=analyze(data,'2027-04-01','wheat','sand',0,{rainRunoffFraction:1,initialStorage:0});assert.ok(all.every(r=>r.effectiveRain===0&&r.storage===0));
  assert.throws(()=>analyze(data,'2027-04-01','wheat','sand',0,{rainRunoffFraction:1.01}));
+ const storm=demoData('2024-04-01',2);storm.days=storm.days.map((d,i)=>({...d,rain:i===0?6:40}));
+ const clay=analyze(storm,'2027-04-01','wheat','clay',0,{irrigationEvents:[],initialStorage:.5});
+ assert.equal(clay[0].effectiveRain,6);assert.equal(clay[0].rainRunoff,0);assert.equal(clay[0].infiltrationCap,8);
+ assert.equal(clay[1].effectiveRain,8);assert.equal(clay[1].rainRunoff,32);
+ const sand=analyze(storm,'2027-04-01','wheat','sand',0,{irrigationEvents:[]});
+ assert.equal(sand[1].effectiveRain,40);assert.equal(sand[1].rainRunoff,0);
+ const forced=analyze(storm,'2027-04-01','wheat','clay',0,{irrigationEvents:[],rainRunoffFraction:0});
+ assert.ok(forced.every(r=>r.effectiveRain===r.rain&&r.infiltrationCap===null));
+ for(const r of clay)assert.ok(Math.abs(r.opening+r.effectiveRain+r.netIrrigation-r.actual-r.drain-r.storage)<1e-9);
 });
 test('terrain interpolation preserves geographic orientation and real vertical scale',()=>{
  const plot:[[number,number],[number,number],[number,number],[number,number]]=[[38,68],[38,68.001],[38.001,68.001],[38.001,68]];
