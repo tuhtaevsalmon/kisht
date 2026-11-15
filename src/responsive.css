@@ -1,0 +1,78 @@
+/* Keep content inside its layout track; do not hide page overflow. */
+.focused-app .field-setup{align-items:stretch}
+.focused-app .setup-advanced{margin:0 0 20px;padding:20px 24px}
+.focused-app .setup-advanced .assumption-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px 24px}
+.focused-app .setup-advanced>summary,.focused-app .setup-advanced>p{grid-column:1/-1}
+.focused-app .setup-advanced .assumption-fields>label{display:grid;gap:8px;margin:0;align-content:start}
+.focused-app .setup-advanced :is(input,select){width:100%}
+.focused-app .analysis-grid+.day-measurements{padding:20px 24px;margin:0 0 20px;border:1px solid #dce3d5;background:#fbfcf7;border-radius:14px}
+.focused-app .day-measurements dl{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.focused-app .day-measurements dl>div{padding:14px;background:#edf2e5;border-radius:9px}
+.focused-app .day-measurements dd{margin:8px 0 0;font-weight:600;text-align:left}
+.focused-app .day-measurements :is(p,small){font-size:13px;line-height:1.65}
+.focused-app .selected-day-risks .day-risk{min-height:0}
+@media(max-width:620px){.focused-app .setup-advanced .assumption-fields,.focused-app .day-measurements dl{grid-template-columns:minmax(0,1fr)}}
+.focused-app .field-setup{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr)}
+.focused-app .source-progress{grid-template-columns:repeat(3,minmax(0,1fr))}
+.focused-app :is(.v2-main,.v2-panel,.field-inputs,.analysis-grid>*,.field-setup>*,.source-progress>*,.source-progress>div>*,.jury-demonstration>*,.auto-plan-choice>*,.season-months>*,.header-tools){min-width:0}
+.focused-app :is(p,small,h1,h2,h3,summary,dd,.run-context,.source-progress,.assistant-applied){overflow-wrap:anywhere}
+.focused-app :is(input,select,textarea){max-width:100%}
+.focused-app :is(button,.panel-heading,.scene-heading,.scene-data,.calendar-timeline>div:first-child,.jury-playback>div:first-child,.jury-scene-heading){max-width:100%}
+.focused-app :is(.panel-heading,.scene-heading,.scene-data,.calendar-timeline>div:first-child,.jury-playback>div:first-child,.jury-scene-heading){flex-wrap:wrap}
+.focused-app button svg{flex-shrink:0}
+.focused-app .season-months{grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr))}
+.focused-app .auto-plan-choice{grid-template-columns:repeat(2,minmax(0,1fr))}
+.focused-app .search-dates>label{flex:1 1 180px;min-width:0}
+.focused-app .search-period :is(input,select){width:100%;min-width:0}
+.focused-app .climate-table-wrap{max-width:100%;overscroll-behavior-x:contain}
+.focused-app .day-status dd{text-align:right;overflow-wrap:anywhere}
+.focused-app .schedule-list>div{grid-template-columns:minmax(0,1.2fr) minmax(0,.8fr) minmax(0,1fr) auto;overflow-wrap:anywhere}
+.focused-app .v2-footer{padding-bottom:100px}
+.focused-app .assistant-header>div{min-width:0}
+.focused-app .assistant-drawer{width:min(440px,calc(100% - 32px));max-height:calc(100dvh - 16px)}
+.focused-app .assistant-photo b{overflow-wrap:anywhere}
+.focused-app .assistant-conversation{min-height:0}
+/* Equal card edges on desktop, with spare room assigned to useful content. */
+@media(min-width:1001px){
+ .focused-app .field-inputs{justify-content:space-between}
+ .focused-app .analysis-grid{align-items:stretch}
+ .focused-app .analysis-grid>.day-status{align-self:stretch;display:flex;flex-direction:column}
+ .focused-app .analysis-grid>.day-status .day-risk-list{flex:1;grid-auto-rows:auto}
+ .focused-app .analysis-grid>.day-status .day-risk{display:flex;flex-direction:column;justify-content:center}
+ .focused-app .analysis-grid>.v2-scene{min-height:0}
+ .focused-app .analysis-grid .v2-canvas{height:auto;min-height:340px;flex:1 0 340px}
+}
+@media(max-width:1100px){
+ .focused-app .v2-header{height:auto;min-height:85px;flex-wrap:wrap;padding-top:14px;padding-bottom:10px;gap:12px}
+ .focused-app .header-tools{margin-left:auto}
+ .focused-app .v2-header nav{order:3;width:100%;min-width:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;overflow:visible}
+ .focused-app .v2-header nav button{min-width:0;min-height:44px;padding:10px 6px;white-space:normal;line-height:1.45;font-size:13px}
+ .focused-app .v2-header nav span{display:none}
+}
+@media(max-width:1000px){.focused-app .field-setup{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:620px){
+ .focused-app .v2-header nav{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+ .focused-app .v2-header nav button{border:1px solid #dce3d5;border-radius:9px;background:#f9faf5;color:#52634b}
+ .focused-app .v2-header nav button.active{background:#e5eddb;border-color:#7c9468;color:#2e4d2b;font-weight:700}
+ .focused-app .source-progress,.focused-app .auto-plan-choice{grid-template-columns:minmax(0,1fr)}
+ .focused-app .v2-panel{padding:16px}
+ .focused-app .map-tools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+ .focused-app .map-tools button{white-space:normal;min-height:44px;font-size:12px}
+ .focused-app .map-search{flex-wrap:wrap}
+ .focused-app .map-search label{flex-basis:calc(50% - 8px)}
+ .focused-app .map-search button{width:100%;min-height:44px}
+ .focused-app .schedule-inputs{grid-template-columns:minmax(0,1fr)}
+ .focused-app .schedule-inputs>label{min-width:0}
+ .focused-app .schedule-inputs>span{padding:0}
+ .focused-app .schedule-inputs>button{min-height:44px}
+ .focused-app .season-day{min-height:44px}
+ .focused-app .source-banner{flex-wrap:wrap}
+ .focused-app .source-banner>div{flex-basis:calc(100% - 40px);min-width:0}
+ .focused-app .source-banner>button{width:100%}
+ .focused-app .scene-data{justify-content:flex-start;gap:10px 16px}
+ .focused-app .calendar-timeline>div:first-child>span,.focused-app .jury-playback>div:first-child>span{margin-left:0;flex-basis:100%}
+ .focused-app .day-status{padding:18px}
+ .focused-app .assistant-launcher{bottom:max(12px,env(safe-area-inset-bottom));right:12px}
+ .focused-app .assistant-drawer{left:8px;right:8px;width:auto;bottom:max(8px,env(safe-area-inset-bottom))}
+}
+
