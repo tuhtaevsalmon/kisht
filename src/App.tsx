@@ -27,7 +27,7 @@ const initialState=()=>{try{return JSON.parse(localStorage.getItem('kisht-field-
 const defaultDate=()=>`${new Date().getFullYear()+1}-04-01`;
 export default function App(){
  const initial=useMemo(initialState,[]);
- const [lang,setLang]=useState<Lang>(initial.lang==='en'?'en':'ru'),[tab,setTab]=useState<Tab>('setup');
+ const [lang,setLang]=useState<Lang>(initial.langChosen&&initial.lang==='ru'?'ru':'en'),[tab,setTab]=useState<Tab>('setup');
  const [plot,setPlot]=useState<Point[]>(validPolygon(initial.plot)?initial.plot:[]);
  const [planting,setPlanting]=useState(validDate(initial.planting??'')?initial.planting:defaultDate());
  const [soil,setSoil]=useState<SoilId>(['loam','clay','sand','unknown'].includes(initial.soil)?initial.soil:'unknown');
@@ -79,7 +79,7 @@ export default function App(){
   const soilWater=({loam:110,sand:60,clay:145,unknown:110})[soil];
   setCrop(next);setWheat({...defaultProfiles[next],availableWater:soilWater,thermal:undefined});setEvents([]);setDay(0);setPlaying(false);
  }
- useEffect(()=>{document.documentElement.lang=lang;document.title=lang==='en'?'Kisht — your field lab':'Кишт — лаборатория поля';try{localStorage.setItem('kisht-field-v2',JSON.stringify({lang,plot,planting,crop,soil,method,initialStorage,waterLimit,wheat,events,year}))}catch{}},[lang,plot,planting,crop,soil,method,initialStorage,waterLimit,wheat,events,year]);
+ useEffect(()=>{document.documentElement.lang=lang;document.title=lang==='en'?'Kisht — your field lab':'Кишт — лаборатория поля';try{localStorage.setItem('kisht-field-v2',JSON.stringify({lang,langChosen:true,plot,planting,crop,soil,method,initialStorage,waterLimit,wheat,events,year}))}catch{}},[lang,plot,planting,crop,soil,method,initialStorage,waterLimit,wheat,events,year]);
  useEffect(()=>{request.current?.abort();request.current=null;supplementalRequest.current?.abort();supplementalRequest.current=null;setLoading(false);setStatus({nasa:'idle',forecast:'idle',terrain:'idle'});setPlaying(false);setDay(0)},[key,JSON.stringify(plot)]);
  useEffect(()=>()=>{request.current?.abort();supplementalRequest.current?.abort()},[]);
  useEffect(()=>{window.scrollTo({top:0,behavior:'instant'});setPlaying(false)},[tab]);
@@ -145,7 +145,7 @@ export default function App(){
   setLoaded({key:`${locationKey}:${date}:${sourceYear}:${duration}:${crop}`,data:source,origin:'plan'});setDay(0);setPlaying(false);setTab('analysis');
  }
  const sourceStatus=(name:'nasa'|'forecast'|'terrain')=>name==='nasa'&&data||name==='forecast'&&weather||name==='terrain'&&terrain?'ready':status[name];
- return <div className="v2-app focused-app"><header className="v2-header"><a className="v2-brand" href="#" onClick={e=>{e.preventDefault();setTab('setup')}}><Sprout/>{t('Кишт','Kisht')}</a><nav aria-label={t('Разделы','Sections')}>{(['setup','analysis','plans','jury'] as Tab[]).map((v,i)=><button key={v} className={tab===v?'active':''} onClick={()=>setTab(v)}>{i<3&&<span>0{i+1}</span>}{({setup:t('Мой участок','My field'),analysis:t('Симуляция','Simulation'),plans:t('Рекомендации','Recommendations'),jury:t('Демо симуляция','Demo simulation')})[v]}</button>)}</nav><button className="language" aria-label="Switch language" onClick={()=>setLang(lang==='ru'?'en':'ru')}>{lang==='ru'?'EN':'RU'}</button></header>
+ return <div className="v2-app focused-app"><header className="v2-header"><a className="v2-brand" href="#" onClick={e=>{e.preventDefault();setTab('setup')}}><Sprout/>{t('Кишт','Kisht')}</a><nav aria-label={t('Разделы','Sections')}>{(['setup','analysis','plans','jury'] as Tab[]).map((v,i)=><button key={v} className={tab===v?'active':''} onClick={()=>setTab(v)}>{i<3&&<span>0{i+1}</span>}{({setup:t('Мой участок','My field'),analysis:t('Симуляция','Simulation'),plans:t('Рекомендации','Recommendations'),jury:t('Демо симуляция','Demo simulation')})[v]}</button>)}</nav><button className="language" aria-label={lang==='en'?'Language: English':'Язык: русский'} onClick={()=>setLang(lang==='en'?'ru':'en')}>{lang==='en'?'EN':'RU'}</button></header>
  <main className="v2-main">
  {assistantUndo&&tab!=='jury'&&<div className="assistant-applied" role="status"><span>{t('Параметры из чата применены как условия сценария.','Chat inputs applied as scenario assumptions.')}</span><button onClick={undoAssistant}>{t('Вернуть предыдущие условия','Restore previous inputs')}</button></div>}
  {tab==='jury'?<Suspense fallback={<p>{t('Открываем демонстрацию…','Opening demonstration…')}</p>}><JuryDemo lang={lang}/></Suspense>:<>
