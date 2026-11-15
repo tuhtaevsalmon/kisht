@@ -1,26 +1,26 @@
 import {useEffect,useState} from 'react';
 import {CalendarDays,Droplets,ArrowRight} from 'lucide-react';
-import {validDate,type Lang,type SoilId,type WaterOptions,type IrrigationEvent,type SourceData} from './domain';
-import type {WheatProfile} from './evapotranspiration';
+import {cropLabels,validDate,type CropId,type Lang,type SoilId,type WaterOptions,type IrrigationEvent,type SourceData} from './domain';
+import type {CropProfile} from './evapotranspiration';
 import {compareAutomaticPlans,loadPlanYears,candidateDates,seasonRange,type PlantingPlan,type SearchRange} from './plantingPlan';
 import './auto-plan.css';
 
-interface Props {lat:number;lon:number;planting:string;soil:SoilId;wheat:WheatProfile;options:WaterOptions;lang:Lang;area:number;onApply:(date:string,events:IrrigationEvent[],source:SourceData,year:number)=>void}
-export default function AutoPlan({lat,lon,planting,soil,wheat,options,lang,area,onApply}:Props){
+interface Props {lat:number;lon:number;planting:string;soil:SoilId;crop:CropId;wheat:CropProfile;options:WaterOptions;lang:Lang;area:number;initialRange?:SearchRange;onApply:(date:string,events:IrrigationEvent[],source:SourceData,year:number)=>void}
+export default function AutoPlan({lat,lon,planting,soil,crop,wheat,options,lang,area,initialRange,onApply}:Props){
  const t=(a:string,b:string)=>lang==='ru'?a:b;
  const [attempt,retry]=useState(0),[result,setResult]=useState<{key:string;plans:PlantingPlan[]}|null>(null),[error,setError]=useState<string|null>(null);
  const month=Number(planting.slice(5,7));
- const [period,setPeriod]=useState<'spring'|'summer'|'autumn'|'custom'>(month>=6&&month<=8?'summer':month>=9&&month<=11?'autumn':'spring');
- const [custom,setCustom]=useState<SearchRange>(()=>seasonRange(planting,'summer'));
+ const [period,setPeriod]=useState<'spring'|'summer'|'autumn'|'custom'>(initialRange?'custom':month>=6&&month<=8?'summer':month>=9&&month<=11?'autumn':'spring');
+ const [custom,setCustom]=useState<SearchRange>(()=>initialRange??seasonRange(planting,'summer'));
  const range=period==='custom'?custom:seasonRange(planting,period);
  let dates:string[]=[];try{dates=candidateDates(range)}catch{}
  const valid=dates.length>0&&validDate(planting)&&range.start.slice(0,4)===planting.slice(0,4);
- const key=JSON.stringify({lat,lon,planting,soil,wheat,options,range});
+ const key=JSON.stringify({lat,lon,planting,soil,crop,wheat,options,range});
  useEffect(()=>{
   const controller=new AbortController();let alive=true;setError(null);setResult(null);if(!valid)return;
   const timeout=setTimeout(()=>controller.abort(),65000);
-  void loadPlanYears(lat,lon,planting,wheat,controller.signal,range).then(years=>{
-   if(alive&&!controller.signal.aborted)setResult({key,plans:compareAutomaticPlans(years,planting,soil,wheat,options,range)});
+  void loadPlanYears(lat,lon,planting,wheat,controller.signal,range,crop).then(years=>{
+   if(alive&&!controller.signal.aborted)setResult({key,plans:compareAutomaticPlans(years,planting,soil,wheat,options,range,crop)});
   }).catch(err=>{if(alive)setError(err instanceof Error?err.message:'NASA request failed')}).finally(()=>clearTimeout(timeout));
   return()=>{alive=false;controller.abort();clearTimeout(timeout)};
  },[key,attempt]);
@@ -41,5 +41,5 @@ export default function AutoPlan({lat,lon,planting,soil,wheat,options,lang,area,
   <details><summary>{t('Почему выбрана эта дата и откуда данные','Why this date and where the data comes from')}</summary><p>{t('Правило: сначала завершённые тепловые циклы, затем меньше дней ниже 0°C, затем жары, затем непокрытой потребности. При равенстве — ближе к вашей дате. Это не оптимизация урожайности. В календарном режиме длительность задана вами, зрелость не проверяется.','Rule: completed thermal cycles first, then fewer days below 0°C, then heat days, then unmet demand. Ties favour your date. This does not optimise yield. Calendar mode uses your assumed duration and does not validate maturity.')}</p><div className="auto-plan-schedule">{plans!.map(p=><div key={p.date}><span>{fmt(p.date)}</span><b>{t('мороз / жара','frost / heat')}: {p.median.frost} / {p.median.heat} · {p.median.unmet.toFixed(1)} mm</b></div>)}</div><p>{t('Полив пытается вернуть запас выше порога стресса, максимум 30 мм за событие. Учитываются заданный лимит и потери. Три года не являются климатической нормой; сортовые повреждения и урожай не рассчитаны.','Irrigation attempts to restore storage above the stress threshold, capped at 30 mm per event, with your supply limit and losses. Three years are not a climate normal; cultivar damage and yield are not modelled.')}</p>{best.years.map(y=><p key={y.year}><a href={y.source.url} target="_blank" rel="noreferrer">NASA {y.year} · {y.source.start} — {y.source.end} ↗</a> · {y.days} {t('дней','days')}</p>)}</details>
  </section>;
  }
- return <><section className="v2-panel search-period"><h2>{t('В каком периоде искать дату посева?','Which sowing period should we search?')}</h2><label>{t('Период посева','Sowing period')}<select value={period} onChange={e=>setPeriod(e.target.value as typeof period)}><option value="spring">{t('Весна · март–май','Spring · March–May')}</option><option value="summer">{t('Лето · июнь–август','Summer · June–August')}</option><option value="autumn">{t('Осень · сентябрь–ноябрь','Autumn · September–November')}</option><option value="custom">{t('Свой период','Custom range')}</option></select></label>{period==='custom'&&<div className="search-dates"><label>{t('С','From')}<input type="date" min="2001-01-01" max="2100-12-31" value={custom.start} onChange={e=>setCustom(r=>({...r,start:e.target.value}))}/></label><label>{t('По','To')}<input type="date" min="2001-01-01" max="2100-12-31" value={custom.end} onChange={e=>setCustom(r=>({...r,end:e.target.value}))}/></label></div>}<p>{t('Год посева','Sowing year')}: {planting.slice(0,4)} · {valid?`${fmt(range.start)} — ${fmt(range.end)}`:'—'}. {t('Поиск идёт автоматически. Проверяем раз в неделю и обе границы периода; не все возможные дни. Исходная дата остаётся базой сравнения.','Search runs automatically. We check weekly dates and both endpoints, not every possible day. Your original date remains the comparison baseline.')}</p><small>{t('Модель — яровая пшеница. Выбор «Осень» не переключает её на озимую.','The model is spring wheat. Selecting autumn does not switch to winter wheat.')}</small></section>{results()}</>;
+ return <><section className="v2-panel search-period"><h2>{t('В каком периоде искать дату посева?','Which sowing period should we search?')}</h2><label>{t('Период посева','Sowing period')}<select value={period} onChange={e=>setPeriod(e.target.value as typeof period)}><option value="spring">{t('Весна · март–май','Spring · March–May')}</option><option value="summer">{t('Лето · июнь–август','Summer · June–August')}</option><option value="autumn">{t('Осень · сентябрь–ноябрь','Autumn · September–November')}</option><option value="custom">{t('Свой период','Custom range')}</option></select></label>{period==='custom'&&<div className="search-dates"><label>{t('С','From')}<input type="date" min="2001-01-01" max="2100-12-31" value={custom.start} onChange={e=>setCustom(r=>({...r,start:e.target.value}))}/></label><label>{t('По','To')}<input type="date" min="2001-01-01" max="2100-12-31" value={custom.end} onChange={e=>setCustom(r=>({...r,end:e.target.value}))}/></label></div>}<p>{t('Год посева','Sowing year')}: {planting.slice(0,4)} · {valid?`${fmt(range.start)} — ${fmt(range.end)}`:'—'}. {t('Поиск идёт автоматически. Проверяем раз в неделю и обе границы периода; не все возможные дни. Исходная дата остаётся базой сравнения.','Search runs automatically. We check weekly dates and both endpoints, not every possible day. Your original date remains the comparison baseline.')}</p> <small>{crop==='wheat'?t('Модель — яровая пшеница. Выбор «Осень» не переключает её на озимую.','The model is spring wheat. Selecting autumn does not switch to winter wheat.'):t(`Модель — ${cropLabels[crop].ru} (профиль FAO-56, не местный сорт).`,`Model — ${cropLabels[crop].en} (FAO-56 profile, not a local cultivar).`)}</small></section>{results()}</>;
 }

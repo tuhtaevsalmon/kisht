@@ -1,5 +1,5 @@
-export type Crop = 'wheat' | 'corn' | 'legume';
-export const crops = {wheat:{name:'Пшеница',need:3.6,heat:30,color:'#c6a75d'},corn:{name:'Кукуруза',need:5,heat:33,color:'#739647'},legume:{name:'Бобовая культура',need:3.2,heat:29,color:'#769c61'}};
+export type Crop = 'wheat' | 'corn' | 'potato' | 'legume';
+export const crops = {wheat:{name:'Пшеница',need:3.6,heat:30,color:'#c6a75d'},corn:{name:'Кукуруза',need:5,heat:33,color:'#739647'},potato:{name:'Картофель',need:4.2,heat:29,color:'#6f8f4e'},legume:{name:'Бобовая культура',need:3.2,heat:29,color:'#769c61'}};
 export const soils = {loam:{name:'Суглинистая',capacity:110},sand:{name:'Песчаная',capacity:60},clay:{name:'Глинистая',capacity:145}};
 export type Soil=keyof typeof soils;
 export interface Weather {temp:number; rain:number; label:string; source:'demo'|'nasa'}

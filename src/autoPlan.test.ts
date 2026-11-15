@@ -1,10 +1,11 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {analyze,demoData,addDays,analogStart,type SourceData} from './domain.ts';
-import {defaultWheat} from './evapotranspiration.ts';
+import {defaultCorn,defaultPotato,defaultWheat} from './evapotranspiration.ts';
+import {seasonLength} from './season.ts';
 import {compareAutomaticPlans,candidateDates,seasonRange,loadPlanYears,type SearchRange,type PlanYear} from './plantingPlan.ts';
 
-function source(start:string):SourceData{const d=demoData(start,135);return {...d,kind:'nasa',days:d.days.map(w=>({...w,min:10,max:25,temp:18,rain:0,et0:4}))};}
+function source(start:string,duration=135):SourceData{const d=demoData(start,duration);return {...d,kind:'nasa',days:d.days.map(w=>({...w,min:10,max:25,temp:18,rain:0,et0:4}))};}
 function fixture(planting='2027-04-01',range?:SearchRange):PlanYear[]{
  const dates=range?candidateDates(range):[-14,0,14].map(shift=>addDays(planting,shift));
  return [2022,2023,2024].map(year=>({year,dates,sources:dates.map(date=>source(analogStart(date,year+Number(date.slice(0,4))-Number(planting.slice(0,4))))),baseline:source(analogStart(planting,year))}));
@@ -58,4 +59,26 @@ test('weekly search maps leap-day samples independently and baseline mapping cro
  assert.equal(plans.find(p=>p.date==='2028-03-01')!.years.find(y=>y.year===2023)!.source.start,'2023-03-01');
  const january=compareAutomaticPlans(fixture('2028-01-05'),'2028-01-05','loam',defaultWheat,{});
  assert.equal(january.find(p=>p.shift===-14)!.years.find(y=>y.year===2023)!.source.start,'2022-12-22');
+});
+
+test('corn and potato recommendations replay every stage of their complete crop cycle',()=>{
+ const planting='2028-05-01',range={start:planting,end:planting};
+ const options={initialStorage:.3,efficiency:.6,weeklyLimit:12};
+ for(const [crop,profile] of [['corn',defaultCorn],['potato',defaultPotato]] as const){
+  const duration=seasonLength(crop,profile);
+  const years=[2022,2023,2024].map(year=>{
+   const data=source(analogStart(planting,year),duration);
+   return {year,dates:[planting],sources:[data],baseline:data};
+  });
+  const best=compareAutomaticPlans(years,planting,'loam',profile,options,range,crop)[0];
+  const rows=analyze(best.replay.source,best.date,crop,'loam',0,{...options,profile,irrigationEvents:best.replay.events});
+  assert.equal(best.completeYears,3);
+  assert.equal(rows.length,duration);
+  assert.deepEqual([0,1,2,3].map(stage=>rows.filter(r=>r.stage===stage).length),profile.stages);
+  assert.equal(rows.at(-1)!.date,addDays(planting,duration-1));
+  assert.ok(Math.abs(rows.reduce((s,r)=>s+r.grossIrrigation,0)-best.replay.water)<1e-9);
+  assert.ok(Math.abs(rows.reduce((s,r)=>s+r.unmet,0)-best.replay.unmet)<1e-9);
+  assert.ok(best.replay.events.length>0);
+  for(let i=0;i<rows.length;i+=7)assert.ok(rows.slice(i,i+7).reduce((s,r)=>s+r.grossIrrigation,0)<=12+1e-9);
+ }
 });

@@ -1,4 +1,4 @@
-import {Droplets,Snowflake,Sun,CheckCircle2} from 'lucide-react';
+import {Droplets,Snowflake,Sun} from 'lucide-react';
 import {stressHistory} from './stressHistory';
 import {cropParams,type CropId,type Lang} from './domain';
 import type {SeasonRow} from './riskEvents';
@@ -14,16 +14,21 @@ export default function DayStatus({row:r,rows,day,lang,onPlan,crop='wheat'}:Prop
  const mm=t('мм','mm');
  return <aside className="day-status selected-day-risks">
   <span className="eyebrow">{t('РИСКИ ВЫБРАННОГО ДНЯ','SELECTED-DAY RISKS')}</span><h2>{date}</h2>
-  <p className="day-risk-count">{count?t(`Сигналов риска: ${count}. Причины ниже.`,`${count} risk signal${count===1?'':'s'}. Causes below.`):t('Три отслеживаемых сигнала риска не выявлены.','None of the three tracked risk signals detected.')}</p>
+  <p className="day-risk-count">{count?t(`Сигналов риска: ${count}. Причины ниже.`,`${count} risk signal${count===1?'':'s'}. Causes below.`):t('Сигналов риска нет. Показатели дня ниже.','No risk signals. Today’s readings are below.')}</p>
   <div className="day-risk-list">
-   {r.waterRisk&&<article className="day-risk water"><h3><Droplets size={18}/>{r.unmet>1e-6?t('Не хватает доступной воды','Available water is limiting uptake'):t('Низкий запас воды','Low water reserve')}</h3>
-    <p>{r.unmet>1e-6?t(`Потребность ${r.demand.toFixed(1)} ${mm}, потребление ${r.actual.toFixed(1)} ${mm}. Не покрыто ${r.unmet.toFixed(1)} ${mm}.`,`Demand is ${r.demand.toFixed(1)} ${mm}, uptake ${r.actual.toFixed(1)} ${mm}. Unmet: ${r.unmet.toFixed(1)} ${mm}.`):t(`Сегодня потребность покрыта, но запас к вечеру ${r.storage.toFixed(1)} ${mm} — ниже порога ${r.stressThreshold.toFixed(1)} ${mm}.`,`Today's demand is met, but closing storage of ${r.storage.toFixed(1)} ${mm} is below the ${r.stressThreshold.toFixed(1)} ${mm} threshold.`)}</p>
-    {r.unmet>1e-6&&<small>{t('Запас к вечеру','Closing storage')}: {r.storage.toFixed(1)} / {r.storageCapacity.toFixed(1)} {mm}.</small>}
-    <p className="day-risk-action">{t('Проверьте влажность в корневом слое и сравните план полива.','Check root-zone moisture and compare the irrigation plan.')}</p>
-   </article>}
-   {r.frost&&<article className="day-risk frost"><h3><Snowflake size={18}/>{t('Риск заморозка','Frost risk')}</h3><p>{t(`Минимум воздуха ${r.min.toFixed(1)} °C — ниже 0 °C. Повреждение зависит от сорта, стадии и длительности холода.`,`Air minimum ${r.min.toFixed(1)} °C is below 0 °C. Damage depends on cultivar, stage and cold duration.`)}</p><p className="day-risk-action">{t('Сверьте ближайший прогноз и чувствительность сорта. Этот сигнал не означает, что посев погиб.','Check the near-term forecast and cultivar sensitivity. This signal does not mean the crop has died.')}</p></article>}
-   {r.heat&&<article className="day-risk heat"><h3><Sun size={18}/>{t('Риск жары','Heat risk')}</h3><p>{t(`Максимум ${r.max.toFixed(1)} °C — выше порога модели ${heatThreshold} °C на ${(r.max-heatThreshold).toFixed(1)} °C.`,`Maximum ${r.max.toFixed(1)} °C exceeds the model's ${heatThreshold} °C threshold by ${(r.max-heatThreshold).toFixed(1)} °C.`)}</p><p className="day-risk-action">{t('Сравните другой срок посева. Полив может снять нехватку воды, но не устраняет жару.','Compare another sowing date. Irrigation can ease water shortage but does not remove heat.')}</p></article>}
-   {!count&&<div className="day-no-risk"><CheckCircle2 size={19}/><p>{t('Проверьте следующие дни сезона. Отсутствие этих сигналов не подтверждает здоровье или урожайность.','Review the following days. Absence of these signals does not establish crop health or yield.')}</p></div>}
+   <article className={`day-risk water${r.waterRisk?'':' ok'}`}><h3><Droplets size={18}/>{r.waterRisk?(r.unmet>1e-6?t('Не хватает доступной воды','Available water is limiting uptake'):t('Низкий запас воды','Low water reserve')):t('Воды достаточно','Water is sufficient')}</h3>
+    <p>{r.waterRisk?(r.unmet>1e-6?t(`Потребность ${r.demand.toFixed(1)} ${mm}, потребление ${r.actual.toFixed(1)} ${mm}. Не покрыто ${r.unmet.toFixed(1)} ${mm}.`,`Demand is ${r.demand.toFixed(1)} ${mm}, uptake ${r.actual.toFixed(1)} ${mm}. Unmet: ${r.unmet.toFixed(1)} ${mm}.`):t(`Сегодня потребность покрыта, но запас к вечеру ${r.storage.toFixed(1)} ${mm} — ниже порога ${r.stressThreshold.toFixed(1)} ${mm}.`,`Today's demand is met, but closing storage of ${r.storage.toFixed(1)} ${mm} is below the ${r.stressThreshold.toFixed(1)} ${mm} threshold.`)):t(`Потребность ${r.demand.toFixed(1)} ${mm}, потребление ${r.actual.toFixed(1)} ${mm}.`,`Demand is ${r.demand.toFixed(1)} ${mm}, uptake ${r.actual.toFixed(1)} ${mm}.`)}</p>
+    <small>{t('Запас к вечеру','Closing storage')}: {r.storage.toFixed(1)} / {r.storageCapacity.toFixed(1)} {mm}.</small>
+    {r.waterRisk&&<p className="day-risk-action">{t('Проверьте влажность в корневом слое и сравните план полива.','Check root-zone moisture and compare the irrigation plan.')}</p>}
+   </article>
+   <article className={`day-risk heat${r.heat?'':' ok'}`}><h3><Sun size={18}/>{r.heat?t('Риск жары','Heat risk'):t('Жара не выявлена','No heat signal')}</h3>
+    <p>{r.heat?t(`Максимум ${r.max.toFixed(1)} °C — выше порога модели ${heatThreshold} °C на ${(r.max-heatThreshold).toFixed(1)} °C.`,`Maximum ${r.max.toFixed(1)} °C exceeds the model's ${heatThreshold} °C threshold by ${(r.max-heatThreshold).toFixed(1)} °C.`):t(`Максимум ${r.max.toFixed(1)} °C. Порог модели ${heatThreshold} °C.`,`Maximum ${r.max.toFixed(1)} °C. Model threshold ${heatThreshold} °C.`)}</p>
+    {r.heat&&<p className="day-risk-action">{t('Сравните другой срок посева. Полив может снять нехватку воды, но не устраняет жару.','Compare another sowing date. Irrigation can ease water shortage but does not remove heat.')}</p>}
+   </article>
+   <article className={`day-risk frost${r.frost?'':' ok'}`}><h3><Snowflake size={18}/>{r.frost?t('Риск заморозка','Frost risk'):t('Заморозок не выявлен','No frost signal')}</h3>
+    <p>{r.frost?t(`Минимум воздуха ${r.min.toFixed(1)} °C — ниже 0 °C. Повреждение зависит от сорта, стадии и длительности холода.`,`Air minimum ${r.min.toFixed(1)} °C is below 0 °C. Damage depends on cultivar, stage and cold duration.`):t(`Минимум воздуха ${r.min.toFixed(1)} °C. Порог заморозка 0 °C.`,`Air minimum ${r.min.toFixed(1)} °C. Frost threshold 0 °C.`)}</p>
+    {r.frost&&<p className="day-risk-action">{t('Сверьте ближайший прогноз и чувствительность сорта. Этот сигнал не означает, что посев погиб.','Check the near-term forecast and cultivar sensitivity. This signal does not mean the crop has died.')}</p>}
+   </article>
   </div>
   <div className="water-gauge"><label>{t('Потребность в воде покрыта','Water demand met')}<b>{r.demand>0?`${Math.round(ratio*100)}%`:'—'}</b></label><meter min="0" max="1" value={ratio}/><small>{r.actual.toFixed(1)} / {r.demand.toFixed(1)} {mm}</small></div>
   <button className="primary" onClick={onPlan}>{t('Сравнить дату и полив','Compare sowing & irrigation')}</button>

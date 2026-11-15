@@ -18,9 +18,19 @@ export function referenceET(w:WeatherET):number|null{
  const et=(.408*delta*rn+gamma*900/(temp+273)*w.wind*(es-ea))/(delta+gamma*(1+.34*w.wind));
  return Number.isFinite(et)?Math.max(0,et):null;
 }
-export interface WheatProfile {thermal?:ThermalProfile;stages:[number,number,number,number];kc:[number,number,number];rootDepth:number;availableWater:number;initialRootDepth?:number;depletionFraction?:number}
-// FAO-56 Table 11 March/April 35–45° latitude example; not locally calibrated.
-export const defaultWheat:WheatProfile={stages:[20,25,60,30],kc:[.3,1.15,.3],rootDepth:1,availableWater:110,initialRootDepth:.2,depletionFraction:.55};
-export function validWheat(p:WheatProfile){return p&&(p.thermal===undefined||validThermal(p.thermal))&&Array.isArray(p.stages)&&p.stages.length===4&&p.stages.every(n=>Number.isInteger(n)&&n>=1&&n<=180)&&p.stages.reduce((s,n)=>s+n,0)<=365&&Array.isArray(p.kc)&&p.kc.length===3&&p.kc.every(n=>Number.isFinite(n)&&n>=.1&&n<=2)&&Number.isFinite(p.rootDepth)&&p.rootDepth>=.1&&p.rootDepth<=2&&Number.isFinite(p.availableWater)&&p.availableWater>=20&&p.availableWater<=250&&(p.initialRootDepth===undefined||Number.isFinite(p.initialRootDepth)&&p.initialRootDepth>=.05&&p.initialRootDepth<=p.rootDepth)&&(p.depletionFraction===undefined||Number.isFinite(p.depletionFraction)&&p.depletionFraction>=.1&&p.depletionFraction<=.8)}
-export function wheatStage(day:number,p:WheatProfile){let end=0;for(let stage=0;stage<4;stage++){end+=p.stages[stage];if(day<end)return stage}return 4}
-export function wheatKc(day:number,p:WheatProfile){const [a,b,c,d]=p.stages,[ini,mid,end]=p.kc;if(day<a)return ini;if(day<a+b)return ini+(mid-ini)*(day-a)/b;if(day<a+b+c)return mid;if(day<a+b+c+d)return mid+(end-mid)*(day-a-b-c)/d;return 0}
+/** FAO-56 single-crop coefficient profile. Not a locally calibrated cultivar. */
+export interface CropProfile {thermal?:ThermalProfile;stages:[number,number,number,number];kc:[number,number,number];rootDepth:number;availableWater:number;initialRootDepth?:number;depletionFraction?:number}
+/** @deprecated Prefer CropProfile — kept for existing imports. */
+export type WheatProfile=CropProfile;
+// FAO-56 Table 11 March/April ~35–45°N examples; not locally calibrated for Tajikistan.
+export const defaultWheat:CropProfile={stages:[20,25,60,30],kc:[.3,1.15,.3],rootDepth:1,availableWater:110,initialRootDepth:.2,depletionFraction:.55};
+export const defaultCorn:CropProfile={stages:[25,40,45,30],kc:[.3,1.2,.35],rootDepth:1.2,availableWater:110,initialRootDepth:.2,depletionFraction:.55};
+export const defaultPotato:CropProfile={stages:[25,30,35,20],kc:[.5,1.15,.75],rootDepth:.6,availableWater:110,initialRootDepth:.15,depletionFraction:.35};
+export const defaultProfiles={wheat:defaultWheat,corn:defaultCorn,potato:defaultPotato} as const;
+export type SimulatedCrop=keyof typeof defaultProfiles;
+export function validCropProfile(p:CropProfile){return p&&(p.thermal===undefined||validThermal(p.thermal))&&Array.isArray(p.stages)&&p.stages.length===4&&p.stages.every(n=>Number.isInteger(n)&&n>=1&&n<=180)&&p.stages.reduce((s,n)=>s+n,0)<=365&&Array.isArray(p.kc)&&p.kc.length===3&&p.kc.every(n=>Number.isFinite(n)&&n>=.1&&n<=2)&&Number.isFinite(p.rootDepth)&&p.rootDepth>=.1&&p.rootDepth<=2&&Number.isFinite(p.availableWater)&&p.availableWater>=20&&p.availableWater<=250&&(p.initialRootDepth===undefined||Number.isFinite(p.initialRootDepth)&&p.initialRootDepth>=.05&&p.initialRootDepth<=p.rootDepth)&&(p.depletionFraction===undefined||Number.isFinite(p.depletionFraction)&&p.depletionFraction>=.1&&p.depletionFraction<=.8)}
+export const validWheat=validCropProfile;
+export function cropStage(day:number,p:CropProfile){let end=0;for(let stage=0;stage<4;stage++){end+=p.stages[stage];if(day<end)return stage}return 4}
+export function cropKc(day:number,p:CropProfile){const [a,b,c,d]=p.stages,[ini,mid,end]=p.kc;if(day<a)return ini;if(day<a+b)return ini+(mid-ini)*(day-a)/b;if(day<a+b+c)return mid;if(day<a+b+c+d)return mid+(end-mid)*(day-a-b-c)/d;return 0}
+export const wheatStage=cropStage;
+export const wheatKc=cropKc;

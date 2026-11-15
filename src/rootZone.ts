@@ -1,6 +1,6 @@
-import type {WheatProfile} from './evapotranspiration.ts';
+import type {CropProfile} from './evapotranspiration.ts';
 // Linear root growth is a scenario assumption, not measured phenology.
-export function rootDepthAt(day:number,p:WheatProfile){
+export function rootDepthAt(day:number,p:CropProfile){
  const start=p.initialRootDepth??Math.min(.2,p.rootDepth);
  const progress=Math.max(0,Math.min(1,day/(p.stages[0]+p.stages[1])));
  return start+(p.rootDepth-start)*progress;

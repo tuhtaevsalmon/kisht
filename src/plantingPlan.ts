@@ -1,7 +1,7 @@
-import {addDays,analogStart,analyze,validDate,type IrrigationEvent,type SoilId,type SourceData,type WaterOptions} from './domain.ts';
+import {addDays,analogStart,analyze,validDate,type CropId,type IrrigationEvent,type SoilId,type SourceData,type WaterOptions} from './domain.ts';
 import {parseLiveNASA} from './liveData.ts';
 import {seasonLength} from './season.ts';
-import type {WheatProfile} from './evapotranspiration.ts';
+import type {CropProfile} from './evapotranspiration.ts';
 
 export interface SearchRange {start:string;end:string}
 export interface PlanYear {year:number;sources:SourceData[];dates?:string[];baseline?:SourceData}
@@ -38,9 +38,9 @@ export const median=(values:number[])=>{const sorted=[...values].sort((a,b)=>a-b
 function metrics(rows:ReturnType<typeof analyze>):PlanMetrics{return {water:rows.reduce((s,r)=>s+r.grossIrrigation,0),unmet:rows.reduce((s,r)=>s+r.unmet,0),waterDays:rows.filter(r=>r.waterRisk).length,heat:rows.filter(r=>r.heat).length,frost:rows.filter(r=>r.frost).length,complete:rows[0]?.developmentMode!=='thermal'||rows.at(-1)?.cycleComplete===true};}
 function medians(values:PlanMetrics[]):Omit<PlanMetrics,'complete'>{return {water:median(values.map(v=>v.water)),unmet:median(values.map(v=>v.unmet)),waterDays:median(values.map(v=>v.waterDays)),heat:median(values.map(v=>v.heat)),frost:median(values.map(v=>v.frost))};}
 
-export async function loadPlanYears(lat:number,lon:number,planting:string,wheat:WheatProfile,signal:AbortSignal,range?:SearchRange):Promise<PlanYear[]>{
+export async function loadPlanYears(lat:number,lon:number,planting:string,profile:CropProfile,signal:AbortSignal,range?:SearchRange,crop:CropId='wheat'):Promise<PlanYear[]>{
  if(!Number.isFinite(lat)||!Number.isFinite(lon)||Math.abs(lat)>85||Math.abs(lon)>180)throw Error('Invalid field coordinates');
- const duration=seasonLength('wheat',wheat),dates=searchDates(planting,range);
+ const duration=seasonLength(crop,profile),dates=searchDates(planting,range);
  signal.throwIfAborted();
  return Promise.all(historicalYears.map(async year=>{
   // Map every proposed date independently: leap days must not shift later month/day samples.
@@ -59,19 +59,20 @@ function requireSource(source:SourceData|undefined,start:string,expected:number)
  if(!source||source.kind!=='nasa'||source.start!==start||source.end!==addDays(start,expected-1)||source.days.length!==expected||source.days.some((d,i)=>d.date!==addDays(start,i)||typeof d.et0!=='number'||!Number.isFinite(d.et0)||d.et0<0))throw Error('Incomplete real-data comparison or mismatched source dates');
 }
 /** A declared comparison rule, not a calibrated yield or profit optimisation. */
-export function compareAutomaticPlans(years:PlanYear[],planting:string,soil:SoilId,wheat:WheatProfile,options:WaterOptions,range?:SearchRange):PlantingPlan[]{
- const dates=searchDates(planting,range),expected=seasonLength('wheat',wheat);
+export function compareAutomaticPlans(years:PlanYear[],planting:string,soil:SoilId,profile:CropProfile,options:WaterOptions,range?:SearchRange,crop:CropId='wheat'):PlantingPlan[]{
+ const dates=searchDates(planting,range),expected=seasonLength(crop,profile);
  if(years.length!==3||new Set(years.map(y=>y.year)).size!==3||historicalYears.some(year=>!years.some(y=>y.year===year))||years.some(y=>y.sources.length!==dates.length))throw Error('Three complete historical years are required');
  for(const year of years){
   if((range&&!year.dates)||year.dates&&(year.dates.length!==dates.length||year.dates.some((date,i)=>date!==dates[i])))throw Error('Mismatched candidate dates');
   year.sources.forEach((source,index)=>requireSource(source,historicalStart(dates[index],planting,year.year),expected));
   requireSource(year.baseline??(!range?year.sources[1]:undefined),analogStart(planting,year.year),expected);
  }
- const baseline=medians(years.map(y=>metrics(analyze(y.baseline??y.sources[1],planting,'wheat',soil,0,{...options,wheat,automaticIrrigation:false,irrigationEvents:options.irrigationEvents??[]}))));
+ const waterOpts={...options,wheat:profile,profile,automaticIrrigation:false as const,irrigationEvents:options.irrigationEvents??[]};
+ const baseline=medians(years.map(y=>metrics(analyze(y.baseline??y.sources[1],planting,crop,soil,0,waterOpts))));
  const candidates=dates.map((date,index)=>{
   const shift=dayDifference(date,planting);
   const replays=years.map(({year,sources})=>{
-   const source=sources[index],rows=analyze(source,date,'wheat',soil,0,{...options,wheat,automaticIrrigation:true,irrigationEvents:[]});
+   const source=sources[index],rows=analyze(source,date,crop,soil,0,{...options,wheat:profile,profile,automaticIrrigation:true,irrigationEvents:[]});
    return {...metrics(rows),year,source,days:rows.length,events:rows.filter(r=>r.grossIrrigation>0).map(r=>({date:r.date,mm:r.grossIrrigation}))};
   });
   const summary=medians(replays);

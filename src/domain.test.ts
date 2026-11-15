@@ -1,4 +1,5 @@
-import {defaultWheat} from './evapotranspiration.ts';
+import {defaultCorn,defaultPotato,defaultWheat} from './evapotranspiration.ts';
+import {seasonLength} from './season.ts';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {addDays,analogStart,validDate,validPolygon,areaHa,analyze,demoData,parseNASA} from './domain.ts';
@@ -94,4 +95,25 @@ test('thermal development delays cold crops and never declares data-end maturity
  const events=rows.filter(r=>r.grossIrrigation>0).map(r=>({date:r.date,mm:r.grossIrrigation}));
  const replay=analyze(warm,'2027-04-01','wheat','loam',0,{wheat:profile,irrigationEvents:events});
  assert.deepEqual(replay.map(r=>[r.storage,r.stage,r.developmentProgress]),rows.map(r=>[r.storage,r.stage,r.developmentProgress]));
+});
+test('corn and potato use FAO-56 profiles with their own season length and heat thresholds',()=>{
+ assert.equal(seasonLength('corn',defaultCorn),140);
+ assert.equal(seasonLength('potato',defaultPotato),110);
+ const withEt0=(planting:string,days:number)=>{
+  const source=demoData(planting,days);
+  source.days=source.days.map(d=>({...d,et0:3,dew:8,wind:2,pressure:90}));
+  return source;
+ };
+ const corn=analyze(withEt0('2024-04-01',140),'2027-04-01','corn','loam',0,{wheat:defaultCorn,profile:defaultCorn,irrigationEvents:[]});
+ assert.equal(corn.length,140);
+ assert.equal(corn[0].demandModel,'fao56');
+ assert.equal(corn[0].kc,defaultCorn.kc[0]);
+ assert.ok(corn.some(r=>r.stage===2&&Math.abs(r.kc!-defaultCorn.kc[1])<1e-9));
+ assert.equal(corn[0].heat,false);
+ const hot={...withEt0('2024-04-01',110),days:withEt0('2024-04-01',110).days.map(d=>({...d,max:35}))};
+ const potato=analyze(hot,'2027-04-01','potato','loam',0,{wheat:defaultPotato,profile:defaultPotato,irrigationEvents:[]});
+ assert.equal(potato.length,110);
+ assert.equal(potato[0].demandModel,'fao56');
+ assert.ok(potato.every(r=>r.heat));
+ assert.ok(potato[50].rootDepth!==null&&potato[50].rootDepth!<=defaultPotato.rootDepth);
 });

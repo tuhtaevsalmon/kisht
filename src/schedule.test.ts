@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {analyze,demoData,parseNASA,addDays} from './domain.ts';
-import {referenceET,defaultWheat,wheatKc,wheatStage} from './evapotranspiration.ts';
+import {referenceET,defaultCorn,defaultPotato,defaultWheat,wheatKc,wheatStage} from './evapotranspiration.ts';
 import {seasonLength} from './season.ts';
 import {windowDates,parseYear} from './climate.ts';
 import {rootDepthAt,rootStress} from './rootZone.ts';
@@ -39,7 +39,9 @@ test('full wheat cycle includes late-stage days, final irrigation and year bound
  assert.equal(rows.length,135);assert.equal(rows.at(-1)!.date,end);assert.equal(rows.at(-1)!.stage,3);assert.equal(rows.at(-1)!.grossIrrigation,20);
  assert.deepEqual([0,1,2,3].map(stage=>rows.filter(r=>r.stage===stage).length),defaultWheat.stages);
  const w=windowDates(start,2024,duration);assert.equal(w.end,addDays('2024-11-01',148));
- assert.equal(seasonLength('corn',defaultWheat,160),160);
+ assert.equal(seasonLength('corn',defaultCorn),140);
+ assert.equal(seasonLength('potato',defaultPotato),110);
+ assert.equal(seasonLength('legume',defaultWheat,160),160);
  assert.throws(()=>demoData(start,366));assert.throws(()=>parseNASA({},start,0));
 });
 test('NASA full-cycle parsing rejects a missing final day in comparison windows',()=>{

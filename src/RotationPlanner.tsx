@@ -1,16 +1,16 @@
 import {useState,useMemo,useEffect,useRef} from 'react';
-import {analyze,addDays,analogStart,parseNASA,type CropId,type SoilId,type Lang,type WaterOptions,type SourceData,type IrrigationEvent} from './domain';
+import {analyze,addDays,analogStart,isSimulatedCrop,parseNASA,type CropId,type SoilId,type Lang,type WaterOptions,type SourceData,type IrrigationEvent} from './domain';
 import {seasonLength} from './season';
-import {defaultWheat} from './evapotranspiration';
+import {defaultProfiles,defaultWheat} from './evapotranspiration';
 import {rotationCandidates,rotationDates,rotationIndicators,type RotationPlan} from './rotation';
 interface Props {lang:Lang;lat:number;lon:number;planting:string;crop:CropId;soil:SoilId;options:WaterOptions;otherDays:number;area:number;onSeason:(crop:CropId,date:string,year:number,data:SourceData,events:IrrigationEvent[])=>void}
 export default function RotationPlanner({lang,lat,lon,planting,crop,soil,options,otherDays,area,onSeason}:Props){
- const t=(a:string,b:string)=>lang==='ru'?a:b, names={wheat:t('Пшеница','Wheat'),corn:t('Кукуруза','Maize'),legume:t('Бобовая — учебный профиль','Legume — illustrative profile')};
- const storageKey=`kisht-rotation:${lat.toFixed(6)}:${lon.toFixed(6)}`;const saved=useMemo(()=>{try{const v=JSON.parse(localStorage.getItem(storageKey)||'{}');return v&&typeof v==='object'?v:{}}catch{return {}}},[storageKey]);const validCrop=(c:unknown)=>['wheat','corn','legume'].includes(String(c));
+ const t=(a:string,b:string)=>lang==='ru'?a:b, names={wheat:t('Пшеница','Wheat'),corn:t('Кукуруза','Maize'),potato:t('Картофель','Potato'),legume:t('Бобовая — учебный профиль','Legume — illustrative profile')};
+ const storageKey=`kisht-rotation:${lat.toFixed(6)}:${lon.toFixed(6)}`;const saved=useMemo(()=>{try{const v=JSON.parse(localStorage.getItem(storageKey)||'{}');return v&&typeof v==='object'?v:{}}catch{return {}}},[storageKey]);const validCrop=(c:unknown)=>['wheat','corn','potato','legume'].includes(String(c));
  const [base,setBase]=useState<RotationPlan>(Array.isArray(saved.base)&&saved.base.length===3&&saved.base.every(validCrop)?saved.base:[crop,crop,crop]),[previous,setPrevious]=useState<CropId|'unknown'>(validCrop(saved.previous)?saved.previous:'unknown'),[priority,setPriority]=useState(['water','soil','cover'].includes(saved.priority)?saved.priority:'water'),[sources,setSources]=useState<SourceData[]>([]),[busy,setBusy]=useState(false),[error,setError]=useState(false);
  useEffect(()=>{try{localStorage.setItem(storageKey,JSON.stringify({base,previous,priority}))}catch{}},[storageKey,base,previous,priority]);
  const request=useRef<AbortController|null>(null),dates=rotationDates(planting),plans=rotationCandidates(base),profile=options.wheat??defaultWheat;
- const length=(c:CropId)=>seasonLength(c,profile,otherDays),maxDuration=Math.max(length('wheat'),otherDays);
+ const length=(c:CropId)=>seasonLength(c,isSimulatedCrop(c)?defaultProfiles[c]:profile,otherDays),maxDuration=Math.max(length('wheat'),length('corn'),length('potato'),otherDays);
  const inputKey=`${lat}:${lon}:${planting}:${maxDuration}`;
  useEffect(()=>{request.current?.abort();setSources([]);setBusy(false);setError(false);return()=>request.current?.abort()},[inputKey]);
  async function load(){request.current?.abort();const controller=new AbortController();request.current=controller;setBusy(true);setError(false);setSources([]);const timeout=setTimeout(()=>controller.abort(),60000);try{const next=await Promise.all([2022,2023,2024].map(async year=>{const start=analogStart(planting,year),end=addDays(start,maxDuration-1);const url=`https://power.larc.nasa.gov/api/temporal/daily/point?parameters=T2M,T2M_MIN,T2M_MAX,PRECTOTCORR,ALLSKY_SFC_SW_DWN,T2MDEW,WS2M,PS&community=AG&latitude=${lat.toFixed(6)}&longitude=${lon.toFixed(6)}&start=${start.replaceAll('-','')}&end=${end.replaceAll('-','')}&format=JSON`;const response=await fetch(url,{signal:controller.signal});if(!response.ok)throw Error();return {days:parseNASA(await response.json(),start,maxDuration),start,end,url,kind:'nasa' as const,fetchedAt:new Date().toISOString()}}));if(request.current===controller&&!controller.signal.aborted)setSources(next)}catch{if(request.current===controller)setError(true)}finally{clearTimeout(timeout);if(request.current===controller)setBusy(false)}}
