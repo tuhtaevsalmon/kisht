@@ -1,6 +1,6 @@
 import {lazy,Suspense,useEffect,useMemo,useRef,useState} from 'react';
 import {Sprout,MapPin,Play,Pause,Layers,ArrowRight,Check,LoaderCircle,AlertTriangle} from 'lucide-react';
-import {analyze,areaHa,center,cropLabels,isSimulatedCrop,validPolygon,validDate,validEvents,type Lang,type Point,type SoilId,type IrrigationEvent,type SourceData} from './domain';
+import {analyze,areaHa,center,cropLabels,isSimulatedCrop,simulatedCrops,validPolygon,validDate,validEvents,type Lang,type Point,type SoilId,type IrrigationEvent,type SourceData} from './domain';
 import {defaultProfiles,validCropProfile,type CropProfile,type SimulatedCrop} from './evapotranspiration';
 import {seasonLength} from './season';
 import {terrainKey,type Terrain} from './terrain';
@@ -70,7 +70,7 @@ export default function App(){
   historicalWeather:data?{provider:'NASA POWER',historicalYear:year,start:data.start,end:data.end,retrievedAt:data.fetchedAt,url:data.url,seasonRainMm:rows.reduce((s,r)=>s+r.rain,0),seasonIrrigationMm:rows.reduce((s,r)=>s+r.grossIrrigation,0),unmetDemandMm:rows.reduce((s,r)=>s+r.unmet,0),waterRiskDays:rows.filter(r=>r.waterRisk).length,heatDays:rows.filter(r=>r.heat).length,frostDays:rows.filter(r=>r.frost).length}:null,
   forecast:weather?{provider:'Open-Meteo',retrievedAt:weather.fetchedAt,url:weather.url,days:weather.days.map(r=>({date:r.date,minC:r.min,maxC:r.max,rainMm:r.rain}))}:null,
   selectedDay:current?{scenarioDate:current.date,sourceDate:current.sourceDate,stage:current.stage,minC:current.min,maxC:current.max,demandMm:current.demand,uptakeMm:current.actual,unmetMm:current.unmet,storageMm:current.storage,waterRisk:current.waterRisk,heat:current.heat,frost:current.frost}:null,
-  capabilities:{supportedSimulationCrops:['wheat','corn','potato'],searchYears:[2022,2023,2024],searchStepDays:7,searchMaxSpanDays:120,seasonIsHistorical:true,yieldAndMortalityModelled:false,photoSoilIsTentative:true}
+  capabilities:{supportedSimulationCrops:simulatedCrops,searchYears:[2022,2023,2024],searchStepDays:7,searchMaxSpanDays:120,seasonIsHistorical:true,yieldAndMortalityModelled:false,photoSoilIsTentative:true}
  };
  const fmt=(date:string)=>new Intl.DateTimeFormat(lang==='ru'?'ru-RU':'en-GB',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'}).format(new Date(date+'T12:00:00Z'));
  const cropName=cropLabels[crop][lang==='ru'?'ru':'en'];
@@ -152,7 +152,7 @@ export default function App(){
  <div className="v2-title"><div><span className="eyebrow">TAJIKISTAN · NASA POWER + SRTM</span><h1>{tab==='setup'?t('Ваше поле. Ваш план.','Your field. Your plan.'):tab==='analysis'?t('Что происходит с посевом?','What is happening to your crop?'):t('Когда сеять и сколько поливать?','When to sow and how much to irrigate?')}</h1><p>{tab==='setup'?t('Обведите участок, укажите дату и условия. Всё остальное загрузим одной кнопкой.','Outline your field, choose the date and conditions. One button loads the data.'):tab==='plans'?t('Сравним сроки на реальной погоде прошлых лет и соберём план для симуляции.','Compare planting dates using past weather and build a plan for simulation.'):t('Погода из NASA. Состояние растений — результат модели с вашими условиями.','Weather from NASA. Crop conditions are model estimates using your inputs.')}</p></div></div>
  {tab==='setup'&&<><div className="field-setup"><section className="v2-panel"><h2><MapPin size={20}/> {t('1. Обведите свой участок','1. Outline your field')}</h2><Suspense fallback={<p>{t('Загружаем карту…','Loading map…')}</p>}><PlotMap lang={lang} value={plot} onChange={setPlot}/></Suspense>{area>0&&<p className="saved-plot"><Check size={17}/>{area.toFixed(2)} {t('га · границы сохранены','ha · boundary saved')}</p>}</section>
  <section className="v2-panel field-inputs"><h2>{t('2. Условия посева','2. Sowing conditions')}</h2>
- <label>{t('Культура','Crop')}<select value={crop} onChange={e=>changeCrop(e.target.value as SimulatedCrop)}>{(['wheat','corn','potato'] as SimulatedCrop[]).map(id=><option key={id} value={id}>{cropLabels[id][lang==='ru'?'ru':'en']}</option>)}</select></label>
+ <label>{t('Культура','Crop')}<select value={crop} onChange={e=>changeCrop(e.target.value as SimulatedCrop)}>{simulatedCrops.map(id=><option key={id} value={id}>{cropLabels[id][lang==='ru'?'ru':'en']}</option>)}</select></label>
  <div className="crop-supported"><Sprout/><div><b>{cropName}</b><small>{t('Профиль FAO-56 · не местный сорт. Параметры можно уточнить ниже.','FAO-56 profile · not a local cultivar. Refine parameters below if needed.')}</small></div></div>
  <label>{t('Когда вы хотите посеять','Your proposed sowing date')}<input type="date" min="2001-01-01" max="2100-12-31" value={planting} onChange={e=>setPlanting(e.target.value)}/></label>
  <label>{t('Почва','Soil')}<select value={soil} onChange={e=>{const v=e.target.value as SoilId;setSoil(v);setWheat(p=>({...p,availableWater:({loam:110,sand:60,clay:145,unknown:110})[v]}))}}>{(['unknown','loam','sand','clay'] as SoilId[]).map(s=><option key={s} value={s}>{({unknown:t('Не знаю','Unknown'),loam:t('Суглинок','Loam'),sand:t('Песчаная','Sandy'),clay:t('Глинистая','Clay')})[s]}</option>)}</select></label>

@@ -26,7 +26,18 @@ export type WheatProfile=CropProfile;
 export const defaultWheat:CropProfile={stages:[20,25,60,30],kc:[.3,1.15,.3],rootDepth:1,availableWater:110,initialRootDepth:.2,depletionFraction:.55};
 export const defaultCorn:CropProfile={stages:[25,40,45,30],kc:[.3,1.2,.35],rootDepth:1.2,availableWater:110,initialRootDepth:.2,depletionFraction:.55};
 export const defaultPotato:CropProfile={stages:[25,30,35,20],kc:[.5,1.15,.75],rootDepth:.6,availableWater:110,initialRootDepth:.15,depletionFraction:.35};
-export const defaultProfiles={wheat:defaultWheat,corn:defaultCorn,potato:defaultPotato} as const;
+// FAO-56 single-crop examples for a full cycle. Not locally calibrated cultivars.
+export const defaultBarley:CropProfile={stages:[15,25,50,30],kc:[.3,1.15,.25],rootDepth:1,availableWater:110,initialRootDepth:.15,depletionFraction:.55};
+export const defaultRice:CropProfile={stages:[30,30,60,30],kc:[1.05,1.2,.9],rootDepth:.5,availableWater:110,initialRootDepth:.1,depletionFraction:.2};
+export const defaultCotton:CropProfile={stages:[30,50,55,45],kc:[.35,1.2,.7],rootDepth:1.4,availableWater:110,initialRootDepth:.2,depletionFraction:.65};
+export const defaultSunflower:CropProfile={stages:[25,35,45,25],kc:[.35,1.1,.35],rootDepth:1.3,availableWater:110,initialRootDepth:.2,depletionFraction:.45};
+export const defaultTomato:CropProfile={stages:[30,40,45,30],kc:[.6,1.15,.8],rootDepth:.8,availableWater:110,initialRootDepth:.15,depletionFraction:.4};
+export const defaultOnion:CropProfile={stages:[15,25,70,40],kc:[.7,1.05,.75],rootDepth:.45,availableWater:110,initialRootDepth:.1,depletionFraction:.3};
+export const defaultCarrot:CropProfile={stages:[25,35,40,20],kc:[.7,1.05,.95],rootDepth:.6,availableWater:110,initialRootDepth:.1,depletionFraction:.35};
+export const defaultCabbage:CropProfile={stages:[40,60,50,15],kc:[.7,1.05,.95],rootDepth:.5,availableWater:110,initialRootDepth:.1,depletionFraction:.45};
+export const defaultCucumber:CropProfile={stages:[20,30,40,15],kc:[.6,1,.75],rootDepth:.7,availableWater:110,initialRootDepth:.12,depletionFraction:.5};
+export const defaultAlfalfa:CropProfile={stages:[15,25,45,15],kc:[.4,1.2,1.15],rootDepth:1.5,availableWater:110,initialRootDepth:.2,depletionFraction:.55};
+export const defaultProfiles={wheat:defaultWheat,corn:defaultCorn,potato:defaultPotato,barley:defaultBarley,rice:defaultRice,cotton:defaultCotton,sunflower:defaultSunflower,tomato:defaultTomato,onion:defaultOnion,carrot:defaultCarrot,cabbage:defaultCabbage,cucumber:defaultCucumber,alfalfa:defaultAlfalfa} as const;
 export type SimulatedCrop=keyof typeof defaultProfiles;
 export function validCropProfile(p:CropProfile){return p&&(p.thermal===undefined||validThermal(p.thermal))&&Array.isArray(p.stages)&&p.stages.length===4&&p.stages.every(n=>Number.isInteger(n)&&n>=1&&n<=180)&&p.stages.reduce((s,n)=>s+n,0)<=365&&Array.isArray(p.kc)&&p.kc.length===3&&p.kc.every(n=>Number.isFinite(n)&&n>=.1&&n<=2)&&Number.isFinite(p.rootDepth)&&p.rootDepth>=.1&&p.rootDepth<=2&&Number.isFinite(p.availableWater)&&p.availableWater>=20&&p.availableWater<=250&&(p.initialRootDepth===undefined||Number.isFinite(p.initialRootDepth)&&p.initialRootDepth>=.05&&p.initialRootDepth<=p.rootDepth)&&(p.depletionFraction===undefined||Number.isFinite(p.depletionFraction)&&p.depletionFraction>=.1&&p.depletionFraction<=.8)}
 export const validWheat=validCropProfile;

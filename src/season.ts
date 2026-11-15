@@ -1,6 +1,6 @@
-import {defaultWheat,validCropProfile,type CropProfile} from './evapotranspiration.ts';
+import {defaultProfiles,defaultWheat,validCropProfile,type CropProfile} from './evapotranspiration.ts';
 
-function simulated(crop:string){return crop==='wheat'||crop==='corn'||crop==='potato'}
+function simulated(crop:string){return Object.prototype.hasOwnProperty.call(defaultProfiles,crop)}
 export function validDuration(days:number){return Number.isInteger(days)&&days>=1&&days<=365}
 export function seasonLength(crop:string,profile:CropProfile=defaultWheat,otherDays=120){
  if(!validCropProfile(profile)||!validDuration(otherDays))throw Error('Invalid season profile');

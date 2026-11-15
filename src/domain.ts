@@ -4,12 +4,12 @@ import {validDuration} from './season.ts';
 import {referenceET,defaultWheat,defaultProfiles,validCropProfile,cropKc,cropStage,type CropProfile,type SimulatedCrop} from './evapotranspiration.ts';
 export type Lang='ru'|'en';
 export type Point=[number,number];
-export type CropId='wheat'|'corn'|'potato'|'legume';
+export type CropId=SimulatedCrop|'legume';
 export type SoilId='loam'|'sand'|'clay'|'unknown';
-export const simulatedCrops:SimulatedCrop[]=['wheat','corn','potato'];
+export const simulatedCrops=Object.keys(defaultProfiles) as SimulatedCrop[];
 export const isSimulatedCrop=(crop:string):crop is SimulatedCrop=>simulatedCrops.includes(crop as SimulatedCrop);
-export const cropParams={wheat:{need:3.6,heat:30},corn:{need:5,heat:33},potato:{need:4.2,heat:29},legume:{need:3.2,heat:29}};
-export const cropLabels={wheat:{ru:'Яровая пшеница',en:'Spring wheat'},corn:{ru:'Кукуруза',en:'Maize'},potato:{ru:'Картофель',en:'Potato'},legume:{ru:'Бобовая',en:'Legume'}} as const;
+export const cropParams={wheat:{need:3.6,heat:30},corn:{need:5,heat:33},potato:{need:4.2,heat:29},barley:{need:3.5,heat:30},rice:{need:6.4,heat:35},cotton:{need:5.6,heat:36},sunflower:{need:4.8,heat:34},tomato:{need:5,heat:32},onion:{need:4,heat:30},carrot:{need:4,heat:30},cabbage:{need:4.2,heat:28},cucumber:{need:4.6,heat:32},alfalfa:{need:5.4,heat:33},legume:{need:3.2,heat:29}};
+export const cropLabels={wheat:{ru:'Яровая пшеница',en:'Spring wheat'},corn:{ru:'Кукуруза',en:'Maize'},potato:{ru:'Картофель',en:'Potato'},barley:{ru:'Ячмень',en:'Barley'},rice:{ru:'Рис',en:'Rice'},cotton:{ru:'Хлопчатник',en:'Cotton'},sunflower:{ru:'Подсолнечник',en:'Sunflower'},tomato:{ru:'Томат',en:'Tomato'},onion:{ru:'Лук',en:'Onion'},carrot:{ru:'Морковь',en:'Carrot'},cabbage:{ru:'Капуста',en:'Cabbage'},cucumber:{ru:'Огурец',en:'Cucumber'},alfalfa:{ru:'Люцерна',en:'Alfalfa'},legume:{ru:'Бобовая',en:'Legume'}} as const;
 export const capacity={loam:110,sand:60,clay:145,unknown:110};
 export interface Daily {date:string;min:number;max:number;temp:number;rain:number;solar:number|null;et0?:number|null;dew?:number|null;wind?:number|null;pressure?:number|null}
 export interface SourceData {days:Daily[];url:string;fetchedAt:string;kind:'nasa'|'demo';start:string;end:string}

@@ -1,8 +1,8 @@
-import {validDate,type CropId,type SoilId} from './domain.ts';
+import {simulatedCrops,validDate,type SoilId} from './domain.ts';
 import {candidateDates} from './plantingPlan.ts';
 
 export type AssistantContext=Record<string,unknown>;
-export type AssistantCrop=Extract<CropId,'wheat'|'corn'|'potato'>;
+export type AssistantCrop=(typeof simulatedCrops)[number];
 export type AssistantProposal=
  | {kind:'search';start:string;end:string;reason:string}
  | {kind:'inputs';planting?:string;crop?:AssistantCrop;soil?:SoilId;method?:'surface'|'sprinkler'|'drip';weeklyWaterM3?:number;reason:string};
@@ -10,7 +10,7 @@ export interface AssistantResponse {answer:string;proposal:AssistantProposal|nul
 const object=(v:unknown):v is Record<string,unknown>=>!!v&&typeof v==='object'&&!Array.isArray(v);
 const text=(v:unknown,max:number):v is string=>typeof v==='string'&&v.trim().length>0&&v.length<=max;
 const date=(v:unknown):v is string=>typeof v==='string'&&validDate(v)&&v>='2001-01-01'&&v<='2100-12-31';
-const crops=['wheat','corn','potato'] as const;
+const crops=simulatedCrops;
 
 /** Model output is a proposed input, never a trusted weather source or irrigation schedule. */
 export function parseAssistantProposal(value:unknown):AssistantProposal|null{

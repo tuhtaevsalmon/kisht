@@ -1,5 +1,5 @@
-export type Crop = 'wheat' | 'corn' | 'potato' | 'legume';
-export const crops = {wheat:{name:'Пшеница',need:3.6,heat:30,color:'#c6a75d'},corn:{name:'Кукуруза',need:5,heat:33,color:'#739647'},potato:{name:'Картофель',need:4.2,heat:29,color:'#6f8f4e'},legume:{name:'Бобовая культура',need:3.2,heat:29,color:'#769c61'}};
+export type Crop = 'wheat' | 'corn' | 'potato' | 'barley' | 'rice' | 'cotton' | 'sunflower' | 'tomato' | 'onion' | 'carrot' | 'cabbage' | 'cucumber' | 'alfalfa' | 'legume';
+export const crops = {wheat:{name:'Пшеница',need:3.6,heat:30,color:'#c6a75d'},corn:{name:'Кукуруза',need:5,heat:33,color:'#739647'},potato:{name:'Картофель',need:4.2,heat:29,color:'#6f8f4e'},barley:{name:'Ячмень',need:3.5,heat:30,color:'#c2a15a'},rice:{name:'Рис',need:6.4,heat:35,color:'#d8d2a4'},cotton:{name:'Хлопчатник',need:5.6,heat:36,color:'#f4f1e6'},sunflower:{name:'Подсолнечник',need:4.8,heat:34,color:'#e0a322'},tomato:{name:'Томат',need:5,heat:32,color:'#c4452d'},onion:{name:'Лук',need:4,heat:30,color:'#e6d2a2'},carrot:{name:'Морковь',need:4,heat:30,color:'#e06a22'},cabbage:{name:'Капуста',need:4.2,heat:28,color:'#b7d7a4'},cucumber:{name:'Огурец',need:4.6,heat:32,color:'#4f9a45'},alfalfa:{name:'Люцерна',need:5.4,heat:33,color:'#7a5ea8'},legume:{name:'Бобовая культура',need:3.2,heat:29,color:'#769c61'}};
 export const soils = {loam:{name:'Суглинистая',capacity:110},sand:{name:'Песчаная',capacity:60},clay:{name:'Глинистая',capacity:145}};
 export type Soil=keyof typeof soils;
 export interface Weather {temp:number; rain:number; label:string; source:'demo'|'nasa'}

@@ -1,8 +1,8 @@
-import {defaultCorn,defaultPotato,defaultWheat} from './evapotranspiration.ts';
+import {defaultCorn,defaultPotato,defaultProfiles,defaultWheat,validCropProfile} from './evapotranspiration.ts';
 import {seasonLength} from './season.ts';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {addDays,analogStart,validDate,validPolygon,areaHa,analyze,demoData,parseNASA} from './domain.ts';
+import {addDays,analogStart,cropParams,simulatedCrops,validDate,validPolygon,areaHa,analyze,demoData,parseNASA} from './domain.ts';
 test('dates cross year and leap boundaries without timezone shifts',()=>{assert.equal(addDays('2024-02-28',1),'2024-02-29');assert.equal(addDays('2024-12-31',1),'2025-01-01');assert.equal(analogStart('2024-02-29',2023),'2023-02-28');assert.equal(validDate('2025-02-29'),false)});
 test('field accepts a simple contour and rejects crossed boundaries',()=>{const p:[[number,number],[number,number],[number,number],[number,number]]=[[38,68],[38,68.001],[38.001,68.001],[38.001,68]];assert.ok(validPolygon(p));assert.ok(areaHa(p)>.8&&areaHa(p)<1.1);assert.equal(validPolygon([p[0],p[2],p[1],p[3]]),false);assert.equal(validPolygon([p[0],p[1]]),false)});
 test('season maps 120 source days onto the chosen planting date and respects water bounds',()=>{const d=demoData('2024-04-01');const r=analyze(d,'2027-11-10','corn','sand',0);assert.equal(r.length,120);assert.equal(r[0].date,'2027-11-10');assert.equal(r[0].sourceDate,'2024-04-01');assert.equal(r[119].date,addDays('2027-11-10',119));assert.ok(r.every(x=>x.moisture>=0&&x.moisture<=1));const wet=analyze(d,'2027-11-10','corn','sand',45);assert.ok(wet.filter(x=>x.waterRisk).length<r.filter(x=>x.waterRisk).length);assert.deepEqual(wet.map(x=>x.heat),r.map(x=>x.heat))});
@@ -116,4 +116,14 @@ test('corn and potato use FAO-56 profiles with their own season length and heat 
  assert.equal(potato[0].demandModel,'fao56');
  assert.ok(potato.every(r=>r.heat));
  assert.ok(potato[50].rootDepth!==null&&potato[50].rootDepth!<=defaultPotato.rootDepth);
+});
+test('each simulated crop keeps its own profile, water need and heat threshold',()=>{
+ assert.equal(simulatedCrops.length,13);
+ for(const crop of simulatedCrops){
+  const profile=defaultProfiles[crop];
+  assert.equal(validCropProfile(profile),true);
+  assert.equal(seasonLength(crop,profile),profile.stages.reduce((a,b)=>a+b,0));
+  assert.ok(cropParams[crop].need>=3);
+  assert.ok(cropParams[crop].heat>=28&&cropParams[crop].heat<=40);
+ }
 });

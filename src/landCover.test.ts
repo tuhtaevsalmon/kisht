@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {fieldSamples,ringContains,surfaceKind,unsuitableSurface,type SurfaceFeature} from './landCover.ts';
+import {assessSowingLand,fieldSamples,ringContains,surfaceKind,unsuitableSurface,type SurfaceFeature} from './landCover.ts';
 import type {Point} from './domain.ts';
 
 const house: Point[] = [[38.57, 68.78], [38.57, 68.7804], [38.5703, 68.7804], [38.5703, 68.78], [38.57, 68.78]];
@@ -22,4 +22,18 @@ test('open soil is kept and a building, road or water covering the outline is re
   assert.equal(surfaceKind({ aeroway: 'runway' }), 'airport');
   assert.equal(surfaceKind({ landuse: 'construction' }), 'construction');
   assert.equal(surfaceKind({ man_made: 'bridge' }), 'road');
+  assert.equal(surfaceKind({ highway: 'service' }), 'road');
+});
+
+test('the field check asks our server and refuses a mapped house', async () => {
+  let called = '';
+  const kinds = await assessSowingLand(house.slice(0, 4), async (url, init) => {
+    called = String(url);
+    assert.equal(init?.method, 'POST');
+    assert.equal(JSON.parse(String(init?.body)).plot.length, 4);
+    return Response.json({ features: [{ tags: { building: 'house' }, geometry: house }] });
+  });
+  assert.equal(called, '/api/surface');
+  assert.ok(kinds.includes('building'));
+  await assert.rejects(() => assessSowingLand(field, async () => Response.json({ error: 'down' }, { status: 503 })));
 });

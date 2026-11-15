@@ -18,7 +18,7 @@ export function surfaceKind(tags: Record<string, string> | undefined): BlockKind
   if (tags.waterway && /^(river|stream|canal|dock)$/.test(tags.waterway)) return 'water';
   if (tags.water && /^(river|lake|pond|reservoir|canal|stream)$/.test(tags.water)) return 'water';
   if (tags.landuse && /^(residential|industrial|commercial|retail|construction|railway|garages|quarry)$/.test(tags.landuse)) return 'construction';
-  if (tags.highway && /^(motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|residential|unclassified|living_street)$/.test(tags.highway)) return 'road';
+  if (tags.highway && /^(motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|residential|unclassified|living_street|service|pedestrian)$/.test(tags.highway)) return 'road';
   if (tags.highway && tags.highway !== 'track' && tags.highway !== 'path' && tags.highway !== 'footway' && /^(asphalt|concrete|paved)$/.test(tags.surface || '')) return 'road';
   return null;
 }
@@ -101,31 +101,16 @@ export function fieldSamples(plot: Point[], count = 12): Point[] {
   return picked.length ? picked : [plot[0]];
 }
 
-function featureList(element: { tags?: Record<string, string>; geometry?: { lat: number; lon: number }[]; lat?: number; lon?: number; members?: { geometry?: { lat: number; lon: number }[] }[] }): SurfaceFeature[] {
-  const tags = element.tags || {};
-  const rings: Point[][] = [];
-  if (element.geometry?.length) rings.push(element.geometry.map(p => [p.lat, p.lon]));
-  for (const member of element.members || []) if (member.geometry?.length) rings.push(member.geometry.map(p => [p.lat, p.lon]));
-  if (!rings.length && typeof element.lat === 'number' && typeof element.lon === 'number') rings.push([[element.lat, element.lon]]);
-  return rings.map(geometry => ({ tags, geometry }));
-}
-
 export async function assessSowingLand(plot: Point[], fetchImpl: typeof fetch = fetch): Promise<BlockKind[]> {
-  const samples = fieldSamples(plot);
-  const south = Math.min(...plot.map(p => p[0])), north = Math.max(...plot.map(p => p[0])), west = Math.min(...plot.map(p => p[1])), east = Math.max(...plot.map(p => p[1]));
-  const box = `${south.toFixed(6)},${west.toFixed(6)},${north.toFixed(6)},${east.toFixed(6)}`;
-  const filters = ['["building"]', '["aeroway"]', '["amenity"="parking"]', '["natural"="water"]', '["landuse"~"^(residential|industrial|commercial|retail|construction|railway|garages|quarry|reservoir|basin)$"]', '["waterway"~"^(river|stream|canal|dock)$"]', '["highway"~"^(motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|residential|unclassified|living_street)$"]', '["bridge"]', '["man_made"="bridge"]'];
-  const query = `[out:json][timeout:20];(${filters.map(filter => `nwr(${box})${filter}`).join(';')};);out tags geom;`;
-  const endpoints = ['https://overpass.openstreetmap.fr/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
-  let last: unknown;
-  for (const endpoint of endpoints) {
-    try {
-      const response = await fetchImpl(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json', 'User-Agent': 'Kisht/0.1 (field surface check)' }, body: `data=${encodeURIComponent(query)}`, signal: AbortSignal.timeout(12000) });
-      if (!response.ok) { last = response.status; continue; }
-      const payload = await response.json() as { elements?: Parameters<typeof featureList>[0][] };
-      const features = (payload.elements || []).flatMap(featureList);
-      return unsuitableSurface(samples, features);
-    } catch (error) { last = error; }
-  }
-  throw last instanceof Error ? last : Error('surface_check_failed');
+  const response = await fetchImpl('/api/surface', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ plot }),
+    signal: AbortSignal.timeout(26000),
+  });
+  if (!response.ok) throw Error('surface_check_failed');
+  const payload = await response.json() as { features?: SurfaceFeature[] };
+  if (!Array.isArray(payload.features)) throw Error('surface_check_failed');
+  const features = payload.features.filter(feature => feature?.tags && Array.isArray(feature.geometry));
+  return unsuitableSurface(fieldSamples(plot), features);
 }
